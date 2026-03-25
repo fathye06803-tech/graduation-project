@@ -19,7 +19,7 @@ class GoalDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double progress = current / target;
+    double progress = target > 0 ? current / target : 0;
 
     return Scaffold(
       body: Stack(
@@ -214,7 +214,7 @@ class GoalDetailsScreen extends StatelessWidget {
                         },
                         child: const Text(
                           "Add Deposit",
-                          style: TextStyle(fontSize: 18),
+                          style: TextStyle(fontSize: 18, color: Colors.white),
                         ),
                       ),
                     ),

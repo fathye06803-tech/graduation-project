@@ -39,9 +39,12 @@ class MyGoalsScreen extends StatelessWidget {
                   IconButton(
                     icon: SvgPicture.asset(
                       "assets/icon/back.svg",
-                      color: AppColors.background,
                       width: 24,
                       height: 24,
+                      colorFilter: const ColorFilter.mode(
+                        AppColors.background,
+                        BlendMode.srcIn,
+                      ),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
@@ -82,6 +85,7 @@ class MyGoalsScreen extends StatelessWidget {
                     title: "New Car",
                     current: 7500,
                     target: 10000,
+                    timeFrame: "12 months",
                   ),
 
                   SizedBox(height: 20),
@@ -90,6 +94,7 @@ class MyGoalsScreen extends StatelessWidget {
                     title: "Saving",
                     current: 10000,
                     target: 20000,
+                    timeFrame: "24 months",
                   ),
 
                   SizedBox(height: 20),
@@ -98,6 +103,7 @@ class MyGoalsScreen extends StatelessWidget {
                     title: "Rent",
                     current: 750,
                     target: 1000,
+                    timeFrame: "1 month",
                   ),
 
                   SizedBox(height: 20),
@@ -106,6 +112,7 @@ class MyGoalsScreen extends StatelessWidget {
                     title: "Education",
                     current: 3500,
                     target: 10000,
+                    timeFrame: "48 months",
                   ),
                 ],
               ),
@@ -151,12 +158,13 @@ class GoalCard extends StatelessWidget {
     required this.title,
     required this.current,
     required this.target,
+    required this.timeFrame,
   });
 
   @override
   Widget build(BuildContext context) {
 
-    double progress = current / target;
+    double progress = target > 0 ? current / target : 0;
 
     return GestureDetector(
       onTap: () {
@@ -164,10 +172,10 @@ class GoalCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => GoalDetailsScreen(
-              goalName: title,
-              targetAmount: target,
-              savedAmount: current,
-              timeFrame: "12 months",
+              title: title,
+              target: target,
+              current: current,
+              timeFrame: timeFrame,
             ),
           ),
         );
