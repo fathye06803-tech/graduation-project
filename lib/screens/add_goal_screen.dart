@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
 
@@ -11,6 +13,67 @@ class AddGoalScreen extends StatefulWidget {
 class _AddGoalScreenState extends State<AddGoalScreen> {
 
   String selectedTime = "12 months";
+
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController targetController = TextEditingController();
+
+  bool isLoading = false;
+
+  // 🔥 Add Goal Function
+  Future<void> addGoal() async {
+
+    // ✅ Validation
+    if (titleController.text.isEmpty || targetController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
+      );
+      return;
+    }
+
+    double? target = double.tryParse(targetController.text);
+
+    if (target == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter valid amount")),
+      );
+      return;
+    }
+
+    try {
+      setState(() => isLoading = true);
+
+      await FirebaseFirestore.instance.collection('goals').add({
+        'title': titleController.text.trim(),
+        'target': target,
+        'current': 0,
+        'timeFrame': selectedTime,
+        'createdAt': Timestamp.now(),
+
+        // 🔥 جاهزة للـ Auth بعدين
+        'userId': 'temp_user',
+      });
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Goal added successfully 🎉")),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    targetController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +97,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
             ),
           ),
 
-          /// Back Button
+          /// Back + Title
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -47,9 +110,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       width: 24,
                       height: 24,
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 20),
                   const Text(
@@ -65,7 +126,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
             ),
           ),
 
-          /// White Container
+          /// Content
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -101,17 +162,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     const SizedBox(height: 10),
 
                     TextField(
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      controller: titleController,
                       decoration: InputDecoration(
                         hintText: "Dream car",
-                        hintStyle: const TextStyle(
-                          fontFamily: 'Work_Sans',
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -138,19 +191,10 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     const SizedBox(height: 10),
 
                     TextField(
+                      controller: targetController,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
                       decoration: InputDecoration(
-                        hintText: "\$ 10.000",
-                        hintStyle: const TextStyle(
-                          fontFamily: 'Work_Sans',
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
+                        hintText: "\$ 10,000",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -178,9 +222,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
                     DropdownButtonFormField<String>(
                       value: selectedTime,
-
-                      icon: const SizedBox(), 
-
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
@@ -188,26 +229,12 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-
                       items: const [
-                        DropdownMenuItem(
-                          value: "6 months",
-                          child: Text("6 months"),
-                        ),
-                        DropdownMenuItem(
-                          value: "12 months",
-                          child: Text("12 months"),
-                        ),
-                        DropdownMenuItem(
-                          value: "24 months",
-                          child: Text("24 months"),
-                        ),
-                        DropdownMenuItem(
-                          value: "3 years",
-                          child: Text("3 years"),
-                        ),
+                        DropdownMenuItem(value: "6 months", child: Text("6 months")),
+                        DropdownMenuItem(value: "12 months", child: Text("12 months")),
+                        DropdownMenuItem(value: "24 months", child: Text("24 months")),
+                        DropdownMenuItem(value: "3 years", child: Text("3 years")),
                       ],
-
                       onChanged: (value) {
                         setState(() {
                           selectedTime = value!;
@@ -228,9 +255,13 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: () {},
-                        child: const Text(
-                          "Amount Deposited",
+                        onPressed: isLoading ? null : addGoal,
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : const Text(
+                          "Save Goal",
                           style: TextStyle(
                             fontFamily: 'Work_Sans',
                             color: AppColors.background,
@@ -241,7 +272,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     ),
 
                     const SizedBox(height: 20),
-
                   ],
                 ),
               ),

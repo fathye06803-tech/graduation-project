@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'add_goal_screen.dart';
 import 'goal_detalis.dart';
@@ -14,7 +15,7 @@ class MyGoalsScreen extends StatelessWidget {
       body: Stack(
         children: [
 
-          /// Blue Header
+          /// Background
           Container(
             height: 260,
             width: double.infinity,
@@ -30,7 +31,7 @@ class MyGoalsScreen extends StatelessWidget {
             ),
           ),
 
-          /// Top Bar
+          /// Header
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -46,9 +47,7 @@ class MyGoalsScreen extends StatelessWidget {
                         BlendMode.srcIn,
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 20),
                   const Text(
@@ -64,7 +63,7 @@ class MyGoalsScreen extends StatelessWidget {
             ),
           ),
 
-          /// Goals Container
+          /// Content
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -77,51 +76,55 @@ class MyGoalsScreen extends StatelessWidget {
                 ),
               ),
 
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: const [
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('goals')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
 
-                  GoalCard(
-                    title: "New Car",
-                    current: 7500,
-                    target: 10000,
-                    timeFrame: "12 months",
-                  ),
+                  if (snapshot.hasError) {
+                    return const Center(child: Text("Error loading goals"));
+                  }
 
-                  SizedBox(height: 20),
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  GoalCard(
-                    title: "Saving",
-                    current: 10000,
-                    target: 20000,
-                    timeFrame: "24 months",
-                  ),
+                  final goals = snapshot.data!.docs;
 
-                  SizedBox(height: 20),
+                  if (goals.isEmpty) {
+                    return const Center(child: Text("No goals yet"));
+                  }
 
-                  GoalCard(
-                    title: "Rent",
-                    current: 750,
-                    target: 1000,
-                    timeFrame: "1 month",
-                  ),
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: goals.length,
+                    itemBuilder: (context, index) {
 
-                  SizedBox(height: 20),
+                      final doc = goals[index]; // مهم
+                      final data = doc.data() as Map<String, dynamic>;
 
-                  GoalCard(
-                    title: "Education",
-                    current: 3500,
-                    target: 10000,
-                    timeFrame: "48 months",
-                  ),
-                ],
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: GoalCard(
+                          goalId: doc.id, // أهم سطر
+                          title: data["title"] ?? "",
+                          current: (data["current"] ?? 0).toDouble(),
+                          target: (data["target"] ?? 0).toDouble(),
+                          timeFrame: data["timeFrame"] ?? "",
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
 
-      /// زرار Add
+      /// ➕ Add Button
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.blue,
         child: SvgPicture.asset(
@@ -146,8 +149,11 @@ class MyGoalsScreen extends StatelessWidget {
   }
 }
 
+
+///  Goal Card
 class GoalCard extends StatelessWidget {
 
+  final String goalId;
   final String title;
   final double current;
   final double target;
@@ -155,6 +161,7 @@ class GoalCard extends StatelessWidget {
 
   const GoalCard({
     super.key,
+    required this.goalId,
     required this.title,
     required this.current,
     required this.target,
@@ -172,6 +179,7 @@ class GoalCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => GoalDetailsScreen(
+              goalId: goalId,
               title: title,
               target: target,
               current: current,
@@ -192,7 +200,6 @@ class GoalCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            /// Goal Title
             Text(
               title,
               style: const TextStyle(
@@ -204,7 +211,6 @@ class GoalCard extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            /// Amount
             Text(
               "\$ ${current.toStringAsFixed(0)} / \$ ${target.toStringAsFixed(0)}",
               style: const TextStyle(
@@ -215,7 +221,6 @@ class GoalCard extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            /// Progress Bar
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(

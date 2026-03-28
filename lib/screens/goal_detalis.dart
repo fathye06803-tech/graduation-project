@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'add_deposit.dart';
 
 class GoalDetailsScreen extends StatelessWidget {
+
+  final String goalId; // ✅ مهم جدًا
   final String title;
   final double current;
   final double target;
@@ -11,6 +13,7 @@ class GoalDetailsScreen extends StatelessWidget {
 
   const GoalDetailsScreen({
     super.key,
+    required this.goalId,
     required this.title,
     required this.current,
     required this.target,
@@ -19,6 +22,7 @@ class GoalDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
     double progress = target > 0 ? current / target : 0;
 
     return Scaffold(
@@ -115,7 +119,7 @@ class GoalDetailsScreen extends StatelessWidget {
                     const Text(
                       "Target Amount",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Colors.black,
                         fontSize: 16,
                       ),
                     ),
@@ -134,7 +138,7 @@ class GoalDetailsScreen extends StatelessWidget {
                     const Text(
                       "Saved Amount",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Colors.black,
                         fontSize: 16,
                       ),
                     ),
@@ -166,7 +170,7 @@ class GoalDetailsScreen extends StatelessWidget {
                     Text(
                       "${(progress * 100).toStringAsFixed(1)}% completed",
                       style: const TextStyle(
-                        color: Colors.grey,
+                        color: Colors.black,
                       ),
                     ),
 
@@ -176,7 +180,7 @@ class GoalDetailsScreen extends StatelessWidget {
                     const Text(
                       "Time Frame",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Colors.black,
                         fontSize: 16,
                       ),
                     ),
@@ -208,13 +212,17 @@ class GoalDetailsScreen extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => AddDepositScreen(
                                 goalName: title,
+                                goalId: goalId, // ✅ كده صح
                               ),
                             ),
                           );
                         },
                         child: const Text(
                           "Add Deposit",
-                          style: TextStyle(fontSize: 18, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

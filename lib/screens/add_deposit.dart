@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AddDepositScreen extends StatefulWidget {
 
   final String goalName;
+  final String goalId;
 
-  const AddDepositScreen({super.key, required this.goalName});
+  const AddDepositScreen({
+    super.key,
+    required this.goalName,
+    required this.goalId,
+  });
 
   @override
   State<AddDepositScreen> createState() => _AddDepositScreenState();
@@ -16,6 +23,67 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
   final TextEditingController amountController = TextEditingController();
 
   DateTime? selectedDate;
+  bool isLoading = false;
+
+  /// 🔥 Add Deposit Function
+  Future<void> addDeposit() async {
+
+    if (amountController.text.isEmpty || selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter amount and date")),
+      );
+      return;
+    }
+
+    double? amount = double.tryParse(amountController.text);
+
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter valid amount")),
+      );
+      return;
+    }
+
+    try {
+      setState(() => isLoading = true);
+
+      /// 🔥 1. تحديث الهدف مباشرة
+      await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(widget.goalId)
+          .update({
+        'current': FieldValue.increment(amount),
+      });
+
+      /// 🔥 2. حفظ العملية في history
+      await FirebaseFirestore.instance.collection('deposits').add({
+        'goalId': widget.goalId,
+        'goalName': widget.goalName, // ✅ مهم علشان يظهر في history
+        'amount': amount,
+        'date': Timestamp.fromDate(selectedDate!), // ✅ مهم
+        'createdAt': Timestamp.now(),
+      });
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Deposit added successfully 💰")),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -194,12 +262,13 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: () {
-
-                        },
-                        child: const Text(
+                        onPressed: isLoading ? null : addDeposit,
+                        child: isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
                           "Confirm Deposit",
                           style: TextStyle(
+                            color: Colors.white,
                             fontSize:18,
                           ),
                         ),

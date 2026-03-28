@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SavingsHistoryScreen extends StatefulWidget {
   const SavingsHistoryScreen({super.key});
@@ -10,25 +11,6 @@ class SavingsHistoryScreen extends StatefulWidget {
 }
 
 class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
-
-  /// مؤقتا بيانات Fake
-  List<Map<String, dynamic>> deposits = [
-    {
-      "goal": "Dream Car",
-      "amount": 200,
-      "date": "12 May 2026"
-    },
-    {
-      "goal": "Travel",
-      "amount": 150,
-      "date": "5 May 2026"
-    },
-    {
-      "goal": "Laptop",
-      "amount": 100,
-      "date": "1 May 2026"
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -99,62 +81,86 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                 ),
               ),
 
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: deposits.length,
-                itemBuilder: (context, index) {
+              child: StreamBuilder(
+                stream: FirebaseFirestore.instance
+                    .collection('deposits')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
 
-                  var deposit = deposits[index];
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom:15),
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  var docs = snapshot.data!.docs;
 
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                  if (docs.isEmpty) {
+                    return const Center(
+                      child: Text("No deposits yet 💰"),
+                    );
+                  }
 
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+
+                      var data = docs[index];
+
+                      /// 🔥 تحويل التاريخ
+                      DateTime date =
+                      (data['date'] as Timestamp).toDate();
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom:15),
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
 
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+
+                                Text(
+                                  data["goalName"] ?? "No Name",
+                                  style: const TextStyle(
+                                    fontSize:18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.blue,
+                                  ),
+                                ),
+
+                                const SizedBox(height:5),
+
+                                Text(
+                                  "${date.day}/${date.month}/${date.year}",
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+
                             Text(
-                              deposit["goal"],
+                              "\$${data["amount"]}",
                               style: const TextStyle(
                                 fontSize:18,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.blue,
+                                color: Colors.green,
                               ),
-                            ),
+                            )
 
-                            const SizedBox(height:5),
-
-                            Text(
-                              deposit["date"],
-                              style: const TextStyle(
-                                color: Colors.grey,
-                              ),
-                            ),
                           ],
                         ),
-
-                        Text(
-                          "\$${deposit["amount"]}",
-                          style: const TextStyle(
-                            fontSize:18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        )
-
-                      ],
-                    ),
+                      );
+                    },
                   );
-
                 },
               ),
             ),
