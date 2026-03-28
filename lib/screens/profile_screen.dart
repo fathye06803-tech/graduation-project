@@ -3,9 +3,53 @@ import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/edit_profile_screen.dart';
 import 'package:blue_cash/screens/login_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+
+  String name = "";
+  String email = "";
+  double totalSavings = 0;
+  int goalsCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchProfileData();
+  }
+
+  /// 🔥 Get Data
+  Future<void> fetchProfileData() async {
+
+    /// مؤقت (لحد ما نربط users)
+    name = "Fathy";
+    email = "fathy@email.com";
+
+    var goalsSnapshot =
+    await FirebaseFirestore.instance.collection('goals').get();
+
+    double total = 0;
+
+    for (var doc in goalsSnapshot.docs) {
+      var data = doc.data();
+
+      if (data.containsKey('current')) {
+        total += (data['current'] as num).toDouble();
+      }
+    }
+
+    setState(() {
+      totalSavings = total;
+      goalsCount = goalsSnapshot.docs.length;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,10 +136,10 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 15),
 
-                  /// User Name
-                  const Text(
-                    "Fathy",
-                    style: TextStyle(
+                  /// Name
+                  Text(
+                    name,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: AppColors.blue,
@@ -105,9 +149,9 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 5),
 
                   /// Email
-                  const Text(
-                    "fathy@email.com",
-                    style: TextStyle(
+                  Text(
+                    email,
+                    style: const TextStyle(
                       fontSize: 16,
                       color: Colors.grey,
                     ),
@@ -129,21 +173,21 @@ class ProfileScreen extends StatelessWidget {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Column(
+                            child: Column(
                               children: [
 
                                 Text(
-                                  "\$ 3,500",
-                                  style: TextStyle(
+                                  "\$ ${totalSavings.toStringAsFixed(0)}",
+                                  style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.blue,
                                   ),
                                 ),
 
-                                SizedBox(height: 5),
+                                const SizedBox(height: 5),
 
-                                Text(
+                                const Text(
                                   "Total Savings",
                                   style: TextStyle(
                                     color: Colors.grey,
@@ -164,21 +208,21 @@ class ProfileScreen extends StatelessWidget {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Column(
+                            child: Column(
                               children: [
 
                                 Text(
-                                  "3",
-                                  style: TextStyle(
+                                  "$goalsCount",
+                                  style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.blue,
                                   ),
                                 ),
 
-                                SizedBox(height: 5),
+                                const SizedBox(height: 5),
 
-                                Text(
+                                const Text(
                                   "Goals",
                                   style: TextStyle(
                                     color: Colors.grey,
@@ -208,15 +252,21 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     title: const Text("Edit Profile"),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () { Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditProfileScreen(
-                          name: "Fathy",
-                          email: "fathy@email.com",
+                    onTap: () async {
+
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditProfileScreen(
+                            name: name,
+                            email: email,
+                          ),
                         ),
-                      ),
-                    );},
+                      );
+
+                      /// 🔥 refresh بعد الرجوع
+                      fetchProfileData();
+                    },
                   ),
 
                   /// Logout

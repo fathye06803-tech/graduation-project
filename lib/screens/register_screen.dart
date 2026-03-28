@@ -1,12 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/login_screen.dart';
-
-import 'login_screen.dart';
 import 'main_navigation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final confirmController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -73,19 +84,35 @@ class RegisterScreen extends StatelessWidget {
 
                   const SizedBox(height: 25),
 
-                  buildTextField("Full Name"),
-                  const SizedBox(height: 25),
-
-                  buildTextField("Email"),
-                  const SizedBox(height: 25),
-
-                  buildTextField("Password", isPassword: true),
-                  const SizedBox(height: 25),
-
-                  buildTextField("Confirm Password", isPassword: true),
+                  /// Name
+                  buildTextField("Full Name", controller: nameController),
 
                   const SizedBox(height: 25),
 
+                  /// Email
+                  buildTextField("Email", controller: emailController),
+
+                  const SizedBox(height: 25),
+
+                  /// Password
+                  buildTextField(
+                    "Password",
+                    isPassword: true,
+                    controller: passwordController,
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  /// Confirm Password
+                  buildTextField(
+                    "Confirm Password",
+                    isPassword: true,
+                    controller: confirmController,
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  /// Create Account Button
                   SizedBox(
                     width: double.infinity,
                     height: 70,
@@ -96,19 +123,72 @@ class RegisterScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
-                      onPressed: () {},
+                      onPressed: () async {
+
+                        if (nameController.text.isEmpty ||
+                            emailController.text.isEmpty ||
+                            passwordController.text.isEmpty ||
+                            confirmController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Enter all fields")),
+                          );
+                          return;
+                        }
+
+                        if (passwordController.text != confirmController.text) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Passwords do not match")),
+                          );
+                          return;
+                        }
+
+                        try {
+
+                          /// 🔥 create user
+                          UserCredential userCredential =
+                          await FirebaseAuth.instance
+                              .createUserWithEmailAndPassword(
+                            email: emailController.text.trim(),
+                            password: passwordController.text.trim(),
+                          );
+
+                          /// 🔥 save user in firestore
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userCredential.user!.uid)
+                              .set({
+                            'name': nameController.text.trim(),
+                            'email': emailController.text.trim(),
+                          });
+
+                          /// 🔥 go to home
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MainNavigation(),
+                            ),
+                          );
+
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
                       child: const Text(
                         "Create Account",
                         style: TextStyle(
-                            color: AppColors.background,
-                            fontFamily: 'Montserrat-SemiBold',
-                            fontSize: 17),
+                          color: AppColors.background,
+                          fontFamily: 'Montserrat-SemiBold',
+                          fontSize: 17,
+                        ),
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 50),
 
+                  /// Login redirect
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -142,8 +222,14 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 
-  Widget buildTextField(String hint, {bool isPassword = false}) {
+  /// 🔥 TextField مع Controller
+  Widget buildTextField(
+      String hint, {
+        bool isPassword = false,
+        required TextEditingController controller,
+      }) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hint,

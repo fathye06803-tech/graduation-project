@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/register_screen.dart';
-import 'register_screen.dart';
 import 'main_navigation.dart';
-class LoginScreen extends StatelessWidget {
+import 'package:firebase_auth/firebase_auth.dart';
+
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +81,21 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 25),
 
-                  buildTextField("Email"),
+                  /// Email
+                  buildTextField("Email", controller: emailController),
+
                   const SizedBox(height: 25),
 
-                  buildTextField("Password", isPassword: true),
+                  /// Password
+                  buildTextField(
+                    "Password",
+                    isPassword: true,
+                    controller: passwordController,
+                  ),
+
                   const SizedBox(height: 25),
 
+                  /// Login Button
                   SizedBox(
                     width: double.infinity,
                     height: 70,
@@ -87,16 +106,38 @@ class LoginScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const MainNavigation(),
-                          ),
-                        );
+                      onPressed: () async {
+
+                        if (emailController.text.isEmpty ||
+                            passwordController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Enter all fields")),
+                          );
+                          return;
+                        }
+
+                        try {
+                          await FirebaseAuth.instance
+                              .signInWithEmailAndPassword(
+                            email: emailController.text.trim(),
+                            password: passwordController.text.trim(),
+                          );
+
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MainNavigation(),
+                            ),
+                          );
+
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Login Failed")),
+                          );
+                        }
                       },
                       child: const Text(
-                        "login",
+                        "Login",
                         style: TextStyle(
                           color: AppColors.background,
                           fontFamily: 'Montserrat-SemiBold',
@@ -108,10 +149,11 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 50),
 
+                  /// Register
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account?"),
+                      const Text("Don't have an account? "),
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -141,8 +183,14 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  Widget buildTextField(String hint, {bool isPassword = false}) {
+  /// 🔥 TextField مع Controller
+  Widget buildTextField(
+      String hint, {
+        bool isPassword = false,
+        required TextEditingController controller,
+      }) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hint,

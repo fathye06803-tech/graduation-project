@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -19,10 +20,19 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
   bool isLoading = false;
 
-  // 🔥 Add Goal Function
+  /// 🔥 Add Goal Function
   Future<void> addGoal() async {
 
-    // ✅ Validation
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You must login first")),
+      );
+      return;
+    }
+
+    /// ✅ Validation
     if (titleController.text.isEmpty || targetController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill all fields")),
@@ -42,15 +52,16 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     try {
       setState(() => isLoading = true);
 
-      await FirebaseFirestore.instance.collection('goals').add({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('goals')
+          .add({
         'title': titleController.text.trim(),
         'target': target,
         'current': 0,
         'timeFrame': selectedTime,
         'createdAt': Timestamp.now(),
-
-        // 🔥 جاهزة للـ Auth بعدين
-        'userId': 'temp_user',
       });
 
       Navigator.pop(context);
@@ -194,7 +205,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       controller: targetController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        hintText: "\$ 10,000",
+                        hintText: "EGP 10,000",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -257,9 +268,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                         onPressed: isLoading ? null : addGoal,
                         child: isLoading
-                            ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
+                            ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                           "Save Goal",
                           style: TextStyle(

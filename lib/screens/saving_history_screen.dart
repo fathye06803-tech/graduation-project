@@ -81,35 +81,46 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                 ),
               ),
 
-              child: StreamBuilder(
+              child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('deposits')
                     .orderBy('createdAt', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
 
-                  if (!snapshot.hasData) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  var docs = snapshot.data!.docs;
-
-                  if (docs.isEmpty) {
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return const Center(
                       child: Text("No deposits yet 💰"),
                     );
                   }
+
+                  var docs = snapshot.data!.docs;
 
                   return ListView.builder(
                     padding: const EdgeInsets.all(20),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
 
-                      var data = docs[index];
+                      var doc = docs[index];
+                      var data = doc.data() as Map<String, dynamic>;
 
-                      /// 🔥 تحويل التاريخ
-                      DateTime date =
-                      (data['date'] as Timestamp).toDate();
+                      /// 🔥 Safe قراءة البيانات
+                      String goalName = data.containsKey('goalName')
+                          ? data['goalName']
+                          : "Unknown Goal";
+
+                      double amount = data.containsKey('amount')
+                          ? (data['amount'] as num).toDouble()
+                          : 0;
+
+                      DateTime date = DateTime.now();
+                      if (data.containsKey('date')) {
+                        date = (data['date'] as Timestamp).toDate();
+                      }
 
                       return Container(
                         margin: const EdgeInsets.only(bottom:15),
@@ -128,7 +139,7 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                               children: [
 
                                 Text(
-                                  data["goalName"] ?? "No Name",
+                                  goalName,
                                   style: const TextStyle(
                                     fontSize:18,
                                     fontWeight: FontWeight.bold,
@@ -148,7 +159,7 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                             ),
 
                             Text(
-                              "\$${data["amount"]}",
+                              "\$${amount.toStringAsFixed(0)}",
                               style: const TextStyle(
                                 fontSize:18,
                                 fontWeight: FontWeight.bold,
