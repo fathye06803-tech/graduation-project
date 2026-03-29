@@ -12,17 +12,12 @@ class AddGoalScreen extends StatefulWidget {
 }
 
 class _AddGoalScreenState extends State<AddGoalScreen> {
-
   String selectedTime = "12 months";
-
   final TextEditingController titleController = TextEditingController();
   final TextEditingController targetController = TextEditingController();
-
   bool isLoading = false;
 
-  /// 🔥 Add Goal Function
   Future<void> addGoal() async {
-
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -32,7 +27,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       return;
     }
 
-    /// ✅ Validation
     if (titleController.text.isEmpty || targetController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill all fields")),
@@ -52,24 +46,27 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     try {
       setState(() => isLoading = true);
 
-      await FirebaseFirestore.instance
+      final goalRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('goals')
-          .add({
+          .doc();
+
+      await goalRef.set({
+        'goalId': goalRef.id,
+        'userId': user.uid,
         'title': titleController.text.trim(),
         'target': target,
-        'current': 0,
+        'current': 0.0,
         'timeFrame': selectedTime,
-        'createdAt': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Goal added successfully 🎉")),
+        const SnackBar(content: Text("Goal added successfully")),
       );
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -91,8 +88,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     return Scaffold(
       body: Stack(
         children: [
-
-          /// Background
           Container(
             height: 260,
             width: double.infinity,
@@ -107,8 +102,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
               ),
             ),
           ),
-
-          /// Back + Title
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -136,8 +129,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
               ),
             ),
           ),
-
-          /// Content
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -149,15 +140,11 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-
                     const SizedBox(height: 30),
-
-                    /// Goal Name
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -169,9 +156,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     TextField(
                       controller: titleController,
                       decoration: InputDecoration(
@@ -183,10 +168,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 25),
-
-                    /// Target Amount
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -198,9 +180,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     TextField(
                       controller: targetController,
                       keyboardType: TextInputType.number,
@@ -213,10 +193,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 25),
-
-                    /// Time Frame
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -228,9 +205,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     DropdownButtonFormField<String>(
                       value: selectedTime,
                       decoration: InputDecoration(
@@ -252,10 +227,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         });
                       },
                     ),
-
                     const Spacer(),
-
-                    /// Button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -279,7 +251,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 20),
                   ],
                 ),

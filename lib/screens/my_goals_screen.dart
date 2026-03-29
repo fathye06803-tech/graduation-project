@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'add_goal_screen.dart';
 import 'goal_detalis.dart';
@@ -11,11 +12,11 @@ class MyGoalsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+
     return Scaffold(
       body: Stack(
         children: [
-
-          /// Background
           Container(
             height: 260,
             width: double.infinity,
@@ -30,8 +31,6 @@ class MyGoalsScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          /// Header
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -62,8 +61,6 @@ class MyGoalsScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          /// Content
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -75,14 +72,14 @@ class MyGoalsScreen extends StatelessWidget {
                   topRight: Radius.circular(30),
                 ),
               ),
-
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
                     .collection('goals')
                     .orderBy('createdAt', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
-
                   if (snapshot.hasError) {
                     return const Center(child: Text("Error loading goals"));
                   }
@@ -101,14 +98,13 @@ class MyGoalsScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     itemCount: goals.length,
                     itemBuilder: (context, index) {
-
-                      final doc = goals[index]; // مهم
+                      final doc = goals[index];
                       final data = doc.data() as Map<String, dynamic>;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: GoalCard(
-                          goalId: doc.id, // أهم سطر
+                          goalId: doc.id,
                           title: data["title"] ?? "",
                           current: (data["current"] ?? 0).toDouble(),
                           target: (data["target"] ?? 0).toDouble(),
@@ -123,8 +119,6 @@ class MyGoalsScreen extends StatelessWidget {
           ),
         ],
       ),
-
-      /// ➕ Add Button
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.blue,
         child: SvgPicture.asset(
@@ -149,10 +143,7 @@ class MyGoalsScreen extends StatelessWidget {
   }
 }
 
-
-///  Goal Card
 class GoalCard extends StatelessWidget {
-
   final String goalId;
   final String title;
   final double current;
@@ -170,7 +161,6 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     double progress = target > 0 ? current / target : 0;
 
     return GestureDetector(
@@ -188,18 +178,15 @@ class GoalCard extends StatelessWidget {
           ),
         );
       },
-
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.grey.shade200,
           borderRadius: BorderRadius.circular(20),
         ),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             Text(
               title,
               style: const TextStyle(
@@ -208,19 +195,15 @@ class GoalCard extends StatelessWidget {
                 color: AppColors.blue,
               ),
             ),
-
             const SizedBox(height: 6),
-
             Text(
-              "\$ ${current.toStringAsFixed(0)} / \$ ${target.toStringAsFixed(0)}",
+              "EGP ${current.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 16),
-
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(

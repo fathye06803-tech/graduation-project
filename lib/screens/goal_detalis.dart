@@ -212,7 +212,7 @@ class GoalDetailsScreen extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => AddDepositScreen(
                                 goalName: title,
-                                goalId: goalId, // ✅ كده صح
+                                goalId: goalId,
                               ),
                             ),
                           );

@@ -130,9 +130,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
 
-                        } catch (e) {
+                        } on FirebaseAuthException catch (e) {
+                          // تعديل الكاتش هنا لمعرفة نوع الخطأ من فايربيز
+                          print("Firebase Auth Error: ${e.code}");
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Login Failed")),
+                            SnackBar(content: Text(e.message ?? "Login Failed")),
+                          );
+                        } catch (e) {
+                          // للأخطاء العامة
+                          print("General Error: $e");
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("An error occurred")),
                           );
                         }
                       },

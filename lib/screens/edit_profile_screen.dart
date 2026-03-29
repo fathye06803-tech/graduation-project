@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EditProfileScreen extends StatefulWidget {
-
   final String name;
   final String email;
 
@@ -18,17 +19,56 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-
   late TextEditingController nameController;
   late TextEditingController emailController;
   final TextEditingController passwordController = TextEditingController();
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-
     nameController = TextEditingController(text: widget.name);
     emailController = TextEditingController(text: widget.email);
+  }
+
+  Future<void> updateProfile() async {
+    setState(() => isLoading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'name': nameController.text.trim(),
+        'email': emailController.text.trim(),
+      }, SetOptions(merge: true));
+
+      if (emailController.text.trim() != widget.email) {
+        await user.verifyBeforeUpdateEmail(emailController.text.trim());
+      }
+
+      if (passwordController.text.isNotEmpty) {
+        await user.updatePassword(passwordController.text.trim());
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile Updated Successfully!")),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -36,21 +76,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       body: Stack(
         children: [
-
-          /// Header
           Container(
             height: 260,
             width: double.infinity,
             color: AppColors.blue,
           ),
-
-          /// Title
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal:16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-
                   IconButton(
                     icon: SvgPicture.asset(
                       "assets/icon/back.svg",
@@ -61,18 +96,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         BlendMode.srcIn,
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                   ),
-
-                  const SizedBox(width:20),
-
+                  const SizedBox(width: 20),
                   const Text(
                     "Edit Profile",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize:20,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
                   )
@@ -80,10 +111,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
           ),
-
-          /// Body
           Padding(
-            padding: const EdgeInsets.only(top:160),
+            padding: const EdgeInsets.only(top: 160),
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -93,15 +122,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-
-                    const SizedBox(height:30),
-
-                    /// Name
+                    const SizedBox(height: 30),
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
@@ -113,10 +138,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-
-                    const SizedBox(height:20),
-
-                    /// Email
+                    const SizedBox(height: 20),
                     TextField(
                       controller: emailController,
                       decoration: InputDecoration(
@@ -128,15 +150,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-
-                    const SizedBox(height:20),
-
-                    /// Password
+                    const SizedBox(height: 20),
                     TextField(
                       controller: passwordController,
                       obscureText: true,
                       decoration: InputDecoration(
-                        labelText: "New Password",
+                        labelText: "New Password (Leave empty to keep current)",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -144,43 +163,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-
                     const Spacer(),
-
-                    /// Save Button
                     SizedBox(
                       width: double.infinity,
-                      height:55,
+                      height: 55,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                        onPressed: () {
-
-                          String newName = nameController.text;
-                          String newEmail = emailController.text;
-                          String newPassword = passwordController.text;
-
-                          /// هنا هتربط الداتا بيز بعدين
-
-                        },
-                        child: const Text(
+                        onPressed: isLoading ? null : updateProfile,
+                        child: isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
                           "Save Changes",
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize:18),
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height:20),
-
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           )
-
         ],
       ),
     );

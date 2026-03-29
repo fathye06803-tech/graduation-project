@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // سطر مهم تم إضافته
 
 class AddDepositScreen extends StatefulWidget {
-
   final String goalName;
   final String goalId;
 
@@ -19,14 +19,20 @@ class AddDepositScreen extends StatefulWidget {
 }
 
 class _AddDepositScreenState extends State<AddDepositScreen> {
-
   final TextEditingController amountController = TextEditingController();
-
   DateTime? selectedDate;
   bool isLoading = false;
 
   /// 🔥 Add Deposit Function
   Future<void> addDeposit() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not logged in")),
+      );
+      return;
+    }
 
     if (amountController.text.isEmpty || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,35 +53,44 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
     try {
       setState(() => isLoading = true);
 
-      /// 🔥 1. تحديث الهدف مباشرة
-      await FirebaseFirestore.instance
+      // التعديل هنا: نذهب للمسار الصحيح للهدف (داخل المستخدم)
+      final goalRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
           .collection('goals')
-          .doc(widget.goalId)
-          .update({
+          .doc(widget.goalId);
+
+      /// 🔥 1. تحديث الهدف مباشرة (زيادة المبلغ الحالي)
+      await goalRef.update({
         'current': FieldValue.increment(amount),
       });
 
-      /// 🔥 2. حفظ العملية في history
-      await FirebaseFirestore.instance.collection('deposits').add({
+      /// 🔥 2. حفظ العملية في deposits (داخل تاريخ المستخدم)
+      // الأفضل تخزن الـ deposits برضه تبع المستخدم عشان الخصوصية
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('deposits')
+          .add({
         'goalId': widget.goalId,
-        'goalName': widget.goalName, // ✅ مهم علشان يظهر في history
+        'goalName': widget.goalName,
         'amount': amount,
-        'date': Timestamp.fromDate(selectedDate!), // ✅ مهم
+        'date': Timestamp.fromDate(selectedDate!),
         'createdAt': Timestamp.now(),
       });
 
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Deposit added successfully 💰")),
-      );
-
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Deposit added successfully 💰")),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -90,17 +105,13 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
     return Scaffold(
       body: Stack(
         children: [
-
           /// Header
           Container(
             height: 260,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.blue,
-                  AppColors.blue,
-                ],
+                colors: [AppColors.blue, AppColors.blue],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -113,7 +124,6 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-
                   IconButton(
                     icon: SvgPicture.asset(
                       "assets/icon/back.svg",
@@ -121,18 +131,14 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                       width: 24,
                       height: 24,
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                   ),
-
-                  const SizedBox(width:20),
-
+                  const SizedBox(width: 20),
                   const Text(
                     "Add Deposit",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize:20,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
                   )
@@ -143,7 +149,7 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
 
           /// Body
           Padding(
-            padding: const EdgeInsets.only(top:160),
+            padding: const EdgeInsets.only(top: 160),
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -153,44 +159,31 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
-                    const SizedBox(height:20),
-
-                    /// Goal Name
+                    const SizedBox(height: 20),
                     Text(
                       widget.goalName,
                       style: const TextStyle(
-                        fontSize:22,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: AppColors.blue,
                       ),
                     ),
-
-                    const SizedBox(height:30),
-
-                    /// Amount Label
+                    const SizedBox(height: 30),
                     const Text(
                       "Deposit Amount",
-                      style: TextStyle(
-                        fontSize:16,
-                        color: AppColors.blue,
-                      ),
+                      style: TextStyle(fontSize: 16, color: AppColors.blue),
                     ),
-
-                    const SizedBox(height:10),
-
-                    /// Amount Field
+                    const SizedBox(height: 10),
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        hintText: "\$ 100",
+                        hintText: "100",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -198,44 +191,28 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                         ),
                       ),
                     ),
-
-                    const SizedBox(height:25),
-
-                    /// Date Label
+                    const SizedBox(height: 25),
                     const Text(
                       "Date",
-                      style: TextStyle(
-                        fontSize:16,
-                        color: AppColors.blue,
-                      ),
+                      style: TextStyle(fontSize: 16, color: AppColors.blue),
                     ),
-
-                    const SizedBox(height:10),
-
-                    /// Date Picker
+                    const SizedBox(height: 10),
                     GestureDetector(
                       onTap: () async {
-
                         DateTime? picked = await showDatePicker(
                           context: context,
                           initialDate: DateTime.now(),
                           firstDate: DateTime(2023),
                           lastDate: DateTime(2030),
                         );
-
-                        if(picked != null){
-                          setState(() {
-                            selectedDate = picked;
-                          });
+                        if (picked != null) {
+                          setState(() => selectedDate = picked);
                         }
-
                       },
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                          horizontal:16,
-                          vertical:18,
-                        ),
+                            horizontal: 16, vertical: 18),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
@@ -248,13 +225,10 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                         ),
                       ),
                     ),
-
                     const Spacer(),
-
-                    /// Confirm Button
                     SizedBox(
                       width: double.infinity,
-                      height:55,
+                      height: 55,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.blue,
@@ -267,16 +241,11 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                           "Confirm Deposit",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize:18,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 18),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height:20),
-
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

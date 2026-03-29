@@ -4,6 +4,7 @@ import 'package:blue_cash/screens/edit_profile_screen.dart';
 import 'package:blue_cash/screens/login_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,7 +14,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-
   String name = "";
   String email = "";
   double totalSavings = 0;
@@ -25,30 +25,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     fetchProfileData();
   }
 
-  /// 🔥 Get Data
   Future<void> fetchProfileData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    /// مؤقت (لحد ما نربط users)
-    name = "Fathy";
-    email = "fathy@email.com";
+    var userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
 
-    var goalsSnapshot =
-    await FirebaseFirestore.instance.collection('goals').get();
+    var goalsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('goals')
+        .get();
 
     double total = 0;
-
     for (var doc in goalsSnapshot.docs) {
-      var data = doc.data();
-
-      if (data.containsKey('current')) {
-        total += (data['current'] as num).toDouble();
-      }
+      total += (doc.data()['current'] ?? 0).toDouble();
     }
 
-    setState(() {
-      totalSavings = total;
-      goalsCount = goalsSnapshot.docs.length;
-    });
+    if (mounted) {
+      setState(() {
+        name = userDoc.data()?['name'] ?? "No Name";
+        email = userDoc.data()?['email'] ?? "";
+        goalsCount = goalsSnapshot.docs.length;
+        totalSavings = total;
+      });
+    }
   }
 
   @override
@@ -56,8 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       body: Stack(
         children: [
-
-          /// Header
           Container(
             height: 260,
             width: double.infinity,
@@ -72,14 +74,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
-          /// Back + Title
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-
                   IconButton(
                     icon: SvgPicture.asset(
                       "assets/icon/back.svg",
@@ -94,9 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.pop(context);
                     },
                   ),
-
                   const SizedBox(width: 20),
-
                   const Text(
                     "Profile",
                     style: TextStyle(
@@ -109,8 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
-          /// Body
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -122,21 +117,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-
               child: Column(
                 children: [
-
                   const SizedBox(height: 40),
-
-                  /// Profile Image
                   const CircleAvatar(
                     radius: 50,
                     backgroundImage: AssetImage("assets/images/user.png"),
                   ),
-
                   const SizedBox(height: 15),
-
-                  /// Name
                   Text(
                     name,
                     style: const TextStyle(
@@ -145,10 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: AppColors.blue,
                     ),
                   ),
-
                   const SizedBox(height: 5),
-
-                  /// Email
                   Text(
                     email,
                     style: const TextStyle(
@@ -156,16 +141,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.grey,
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  /// Info Cards
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-
-                        /// Total Savings
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(20),
@@ -175,18 +155,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Column(
                               children: [
-
                                 Text(
-                                  "\$ ${totalSavings.toStringAsFixed(0)}",
+                                  "\$ ${totalSavings.toStringAsFixed(0)}", // تم التعديل هنا إلى دولار
                                   style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.blue,
                                   ),
                                 ),
-
                                 const SizedBox(height: 5),
-
                                 const Text(
                                   "Total Savings",
                                   style: TextStyle(
@@ -197,10 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-
                         const SizedBox(width: 15),
-
-                        /// Goals Count
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(20),
@@ -210,7 +184,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Column(
                               children: [
-
                                 Text(
                                   "$goalsCount",
                                   style: const TextStyle(
@@ -219,9 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     color: AppColors.blue,
                                   ),
                                 ),
-
                                 const SizedBox(height: 5),
-
                                 const Text(
                                   "Goals",
                                   style: TextStyle(
@@ -232,14 +203,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  /// Edit Profile
                   ListTile(
                     leading: SvgPicture.asset(
                       'assets/icon/edit.svg',
@@ -253,7 +220,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: const Text("Edit Profile"),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () async {
-
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -263,13 +229,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       );
-
-                      /// 🔥 refresh بعد الرجوع
                       fetchProfileData();
                     },
                   ),
-
-                  /// Logout
                   ListTile(
                     leading: SvgPicture.asset(
                       'assets/icon/logout.svg',
@@ -293,7 +255,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: const Text("Cancel"),
                             ),
                             TextButton(
-                              onPressed: () {
+                              onPressed: () async {
+                                await FirebaseAuth.instance.signOut();
                                 Navigator.pushAndRemoveUntil(
                                   context,
                                   MaterialPageRoute(
@@ -309,12 +272,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
-
                 ],
               ),
             ),
           ),
-
         ],
       ),
     );

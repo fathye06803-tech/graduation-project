@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SavingsHistoryScreen extends StatefulWidget {
   const SavingsHistoryScreen({super.key});
@@ -11,36 +12,29 @@ class SavingsHistoryScreen extends StatefulWidget {
 }
 
 class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
-
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       body: Stack(
         children: [
-
-          /// Header
           Container(
             height: 260,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.blue,
-                  AppColors.blue,
-                ],
+                colors: [AppColors.blue, AppColors.blue],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
             ),
           ),
-
-          /// Back + Title
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-
                   IconButton(
                     icon: SvgPicture.asset(
                       "assets/icon/back.svg",
@@ -48,18 +42,14 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                       width: 24,
                       height: 24,
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                   ),
-
-                  const SizedBox(width:20),
-
+                  const SizedBox(width: 20),
                   const Text(
                     "Savings History",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize:20,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -67,10 +57,8 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           ),
-
-          /// Body
           Padding(
-            padding: const EdgeInsets.only(top:160),
+            padding: const EdgeInsets.only(top: 160),
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -80,14 +68,16 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-
-              child: StreamBuilder<QuerySnapshot>(
+              child: user == null
+                  ? const Center(child: Text("Please login first"))
+                  : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
                     .collection('deposits')
-                    .orderBy('createdAt', descending: true)
+                    .orderBy('date', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
-
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
@@ -104,69 +94,48 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                     padding: const EdgeInsets.all(20),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
+                      var data = docs[index].data() as Map<String, dynamic>;
 
-                      var doc = docs[index];
-                      var data = doc.data() as Map<String, dynamic>;
-
-                      /// 🔥 Safe قراءة البيانات
-                      String goalName = data.containsKey('goalName')
-                          ? data['goalName']
-                          : "Unknown Goal";
-
-                      double amount = data.containsKey('amount')
-                          ? (data['amount'] as num).toDouble()
-                          : 0;
-
-                      DateTime date = DateTime.now();
-                      if (data.containsKey('date')) {
-                        date = (data['date'] as Timestamp).toDate();
-                      }
+                      String goalName = data['goalName'] ?? "Unknown Goal";
+                      double amount = (data['amount'] as num?)?.toDouble() ?? 0;
+                      DateTime date = (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom:15),
+                        margin: const EdgeInsets.only(bottom: 15),
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
-
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-
                                 Text(
                                   goalName,
                                   style: const TextStyle(
-                                    fontSize:18,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.blue,
                                   ),
                                 ),
-
-                                const SizedBox(height:5),
-
+                                const SizedBox(height: 5),
                                 Text(
                                   "${date.day}/${date.month}/${date.year}",
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
                               ],
                             ),
-
                             Text(
-                              "\$${amount.toStringAsFixed(0)}",
+                              "EGP ${amount.toStringAsFixed(0)}",
                               style: const TextStyle(
-                                fontSize:18,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
                               ),
                             )
-
                           ],
                         ),
                       );
@@ -176,7 +145,6 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           )
-
         ],
       ),
     );
