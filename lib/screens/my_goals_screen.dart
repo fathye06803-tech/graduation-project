@@ -171,9 +171,6 @@ class GoalCard extends StatelessWidget {
             builder: (context) => GoalDetailsScreen(
               goalId: goalId,
               title: title,
-              target: target,
-              current: current,
-              timeFrame: timeFrame,
             ),
           ),
         );
