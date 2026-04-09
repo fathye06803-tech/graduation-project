@@ -14,11 +14,12 @@ dependencies:
 
   cupertino_icons: ^1.0.6
   flutter_svg: ^2.0.7
-
-
   firebase_core: ^4.6.0
   cloud_firestore: ^6.2.0
   firebase_auth: ^6.3.0
+  flutter_dotenv: ^6.0.0
+  google_generative_ai: ^0.4.0
+
 
 dev_dependencies:
   flutter_test:
@@ -34,6 +35,7 @@ flutter:
     - assets/fonts/
     - assets/image/
     - assets/icon/
+    - .env
 
   fonts:
     - family: Montserrat

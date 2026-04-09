@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'add_goal_screen.dart';
 import 'goal_detalis.dart';
+import 'edit_goal_screen.dart'; // استيراد صفحة التعديل
 
 class MyGoalsScreen extends StatelessWidget {
   const MyGoalsScreen({super.key});
@@ -17,6 +18,7 @@ class MyGoalsScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          /// Header Background
           Container(
             height: 260,
             width: double.infinity,
@@ -31,23 +33,13 @@ class MyGoalsScreen extends StatelessWidget {
               ),
             ),
           ),
+
+          /// Header UI
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: SvgPicture.asset(
-                      "assets/icon/back.svg",
-                      width: 24,
-                      height: 24,
-                      colorFilter: const ColorFilter.mode(
-                        AppColors.background,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
                   const SizedBox(width: 20),
                   const Text(
                     "My Goals",
@@ -61,6 +53,8 @@ class MyGoalsScreen extends StatelessWidget {
               ),
             ),
           ),
+
+          /// Goals List Container
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -184,13 +178,38 @@ class GoalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.blue,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.blue,
+                    ),
+                  ),
+                ),
+
+                /// Edit Icon Button
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.blue, size: 24),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditGoalScreen(
+                          goalId: goalId,
+                          title: title,
+                          target: target,
+                          timeFrame: timeFrame,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(

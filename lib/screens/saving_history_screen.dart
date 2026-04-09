@@ -35,15 +35,7 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: SvgPicture.asset(
-                      "assets/icon/back.svg",
-                      color: AppColors.background,
-                      width: 24,
-                      height: 24,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+
                   const SizedBox(width: 20),
                   const Text(
                     "Savings History",
