@@ -38,18 +38,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // 1. تحديث البيانات في الفايرستور
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .set({
+          .update({
         'name': nameController.text.trim(),
         'email': emailController.text.trim(),
-      }, SetOptions(merge: true));
+      });
 
+      // 2. تحديث الاسم في ملف الـ Auth
+      await user.updateDisplayName(nameController.text.trim());
+
+      // 3. تحديث الإيميل (لو اتغير)
       if (emailController.text.trim() != widget.email) {
         await user.verifyBeforeUpdateEmail(emailController.text.trim());
       }
 
+      // 4. تحديث الباسورد (لو اتكتب)
       if (passwordController.text.isNotEmpty) {
         await user.updatePassword(passwordController.text.trim());
       }
@@ -58,7 +64,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile Updated Successfully!")),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -74,6 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           Container(
@@ -115,6 +122,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             padding: const EdgeInsets.only(top: 160),
             child: Container(
               width: double.infinity,
+              height: double.infinity,
               decoration: const BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.only(
@@ -122,48 +130,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
                     const SizedBox(height: 30),
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: "Name",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
+                    buildTextField("Name", nameController),
                     const SizedBox(height: 20),
-                    TextField(
-                      controller: emailController,
-                      decoration: InputDecoration(
-                        labelText: "Email",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
+                    buildTextField("Email", emailController),
                     const SizedBox(height: 20),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: "New Password (Leave empty to keep current)",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
+                    buildTextField("New Password (Optional)", passwordController, isPassword: true),
+                    const SizedBox(height: 40),
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -193,6 +170,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           )
         ],
+      ),
+    );
+  }
+
+  Widget buildTextField(String label, TextEditingController controller, {bool isPassword = false}) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.blue),
+        filled: true,
+        fillColor: Colors.white,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.blue, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
       ),
     );
   }
