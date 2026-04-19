@@ -5,15 +5,8 @@ import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await dotenv.load(fileName: ".env");
-
-    await Firebase.initializeApp();
-  } catch (e) {
-    print("Error during initialization: $e");
-  }
-
+  await Firebase.initializeApp();
+  await dotenv.load(fileName: ".env");
   runApp(const MyApp());
 }
 

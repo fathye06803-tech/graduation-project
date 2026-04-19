@@ -24,7 +24,7 @@ class _AiScreenState extends State<AiScreen> {
     }
   ];
 
-  /// 🔥 Send Message Function
+  /// 🔥 Send Message
   Future<void> sendMessage() async {
     if (messageController.text.trim().isEmpty) return;
 
@@ -38,10 +38,23 @@ class _AiScreenState extends State<AiScreen> {
     messageController.clear();
 
     try {
-      final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
-      final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
+      /// ✅ Check User
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception("User not logged in");
+      }
 
-      /// 1. Fetch Goals for Context
+      final String uid = user.uid;
+
+      /// ✅ Check API KEY
+      final String apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
+      print("API KEY: $apiKey");
+
+      if (apiKey.isEmpty) {
+        throw Exception("API Key is empty");
+      }
+
+      /// ✅ Get Goals
       final goalsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -51,39 +64,38 @@ class _AiScreenState extends State<AiScreen> {
       String goalsData = "";
       for (var doc in goalsSnapshot.docs) {
         var d = doc.data();
-        goalsData += "- Goal: ${d['title']}, Target: ${d['target']} EGP, Saved: ${d['current']} EGP.\n";
+        goalsData +=
+        "- Goal: ${d['title']}, Target: ${d['target']} EGP, Saved: ${d['current']} EGP.\n";
       }
 
-      /// 2. Setup AI with Correct Safety Settings
-      // بنخلي الـ Threshold هو 'blockNone' عشان ميقفلش الردود المالية
+      if (goalsData.isEmpty) {
+        goalsData = "No goals found.";
+      }
+
+      /// ✅ Gemini Model
       final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
+        model: 'models/gemini-1.5-flash',
         apiKey: apiKey,
         systemInstruction: Content.system(
-            "You are a helpful financial assistant for 'Blue Cash' app. "
-                "Use the user's goal data to provide advice: $goalsData. "
-                "Keep your responses short, professional, and friendly."
+          "You are a smart financial assistant for 'Blue Cash'. "
+              "User goals:\n$goalsData\n"
+              "Give short, useful, friendly advice.",
         ),
-        safetySettings: [
-          SafetySetting(HarmCategory.harassment, HarmBlockThreshold.none),
-          SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.none),
-          SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.none),
-          SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.none),
-        ],
       );
 
-      final content = [Content.text(userMessage)];
-      final response = await model.generateContent(content);
+      /// ✅ Send Request
+      final response = await model.generateContent([
+        Content.text(userMessage),
+      ]);
 
-      /// 3. Handle Response safely
+      /// ✅ Handle Response
       if (mounted) {
         setState(() {
-          // هنا بنشيك هل الرد فيه نص فعلاً ولا الـ AI عمل بلوك للـ Candidate
           if (response.text != null && response.text!.isNotEmpty) {
             messages.add({"text": response.text!, "isUser": false});
           } else {
             messages.add({
-              "text": "I can't answer this right now. Please try asking about your savings or goals.",
+              "text": "I couldn't understand. Try asking about your goals or savings.",
               "isUser": false
             });
           }
@@ -91,11 +103,16 @@ class _AiScreenState extends State<AiScreen> {
         });
       }
 
-    } catch (e) {
-      debugPrint("AI Error: $e");
+    } catch (e, stack) {
+      print("❌ ERROR: $e");
+      print("📌 STACK: $stack");
+
       if (mounted) {
         setState(() {
-          messages.add({"text": "Connection issue. Please check your internet or API key.", "isUser": false});
+          messages.add({
+            "text": "⚠️ Error: ${e.toString()}",
+            "isUser": false
+          });
           isLoading = false;
         });
       }
@@ -107,7 +124,7 @@ class _AiScreenState extends State<AiScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          /// Header Background
+          /// Header
           Container(
             height: 260,
             width: double.infinity,
@@ -120,7 +137,7 @@ class _AiScreenState extends State<AiScreen> {
             ),
           ),
 
-          /// Header UI
+          /// Title
           SafeArea(
             child: Column(
               children: [
@@ -129,12 +146,24 @@ class _AiScreenState extends State<AiScreen> {
                   child: Row(
                     children: [
                       SizedBox(width: 20),
-                      Text("Smart Assistant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                      Text(
+                        "Smart Assistant",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
-                SvgPicture.asset("assets/icon/ai logo.svg", width: 70, colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn)),
+                SvgPicture.asset(
+                  "assets/icon/ai logo.svg",
+                  width: 70,
+                  colorFilter: const ColorFilter.mode(
+                      Colors.white, BlendMode.srcIn),
+                ),
               ],
             ),
           ),
@@ -145,48 +174,70 @@ class _AiScreenState extends State<AiScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 color: AppColors.background,
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
               ),
               child: Column(
                 children: [
                   const SizedBox(height: 20),
+
+                  /// Messages
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
                         bool isUser = messages[index]["isUser"];
+
                         return Align(
-                          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment: isUser
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: isUser ? AppColors.blue : const Color(0xff9FB5D8),
+                              color: isUser
+                                  ? AppColors.blue
+                                  : const Color(0xff9FB5D8),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
                               messages[index]["text"],
-                              style:
-                              TextStyle(color: isUser ? Colors.white : AppColors.blue,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                color: isUser
+                                    ? Colors.white
+                                    : AppColors.blue,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         );
                       },
                     ),
                   ),
-                  if (isLoading) const Padding(padding: EdgeInsets.only(bottom: 10),
-                      child: CircularProgressIndicator(color: AppColors.blue)),
 
-                  /// Input Field
+                  /// Loading
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
+                      child: CircularProgressIndicator(
+                        color: AppColors.blue,
+                      ),
+                    ),
+
+                  /// Input
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(color: const Color(0xff9FB5D8),
-                          borderRadius: BorderRadius.circular(40)),
+                      decoration: BoxDecoration(
+                        color: const Color(0xff9FB5D8),
+                        borderRadius: BorderRadius.circular(40),
+                      ),
                       child: Row(
                         children: [
                           Expanded(
@@ -194,15 +245,20 @@ class _AiScreenState extends State<AiScreen> {
                               controller: messageController,
                               onSubmitted: (_) => sendMessage(),
                               decoration: const InputDecoration(
-                                  hintText: "Type your message...",
-                                  border: InputBorder.none),
+                                hintText: "Type your message...",
+                                border: InputBorder.none,
+                              ),
                             ),
                           ),
                           IconButton(
-                            icon: SvgPicture.asset("assets/icon/send.svg",
-                                width: 26,
-                                colorFilter: const ColorFilter.mode(AppColors.blue, BlendMode.srcIn)),
-                            onPressed: isLoading ? null : sendMessage,
+                            icon: SvgPicture.asset(
+                              "assets/icon/send.svg",
+                              width: 26,
+                              colorFilter: const ColorFilter.mode(
+                                  AppColors.blue, BlendMode.srcIn),
+                            ),
+                            onPressed:
+                            isLoading ? null : sendMessage,
                           ),
                         ],
                       ),

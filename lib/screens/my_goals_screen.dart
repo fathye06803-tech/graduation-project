@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'add_goal_screen.dart';
 import 'goal_detalis.dart';
-import 'edit_goal_screen.dart'; // استيراد صفحة التعديل
+import 'edit_goal_screen.dart';
 
 class MyGoalsScreen extends StatelessWidget {
   const MyGoalsScreen({super.key});
@@ -155,7 +155,11 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double progress = target > 0 ? current / target : 0;
+    final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+
+    double safeCurrent = current > target ? target : current;
+    double progress = target > 0 ? safeCurrent / target : 0;
+    bool isCompleted = safeCurrent >= target;
 
     return GestureDetector(
       onTap: () {
@@ -192,9 +196,9 @@ class GoalCard extends StatelessWidget {
                   ),
                 ),
 
-                /// Edit Icon Button
+                /// Edit
                 IconButton(
-                  icon: const Icon(Icons.edit, color: AppColors.blue, size: 24),
+                  icon: const Icon(Icons.edit, color: AppColors.blue),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -209,26 +213,78 @@ class GoalCard extends StatelessWidget {
                     );
                   },
                 ),
+
+                /// Delete
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () async {
+                    bool? confirm = await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Delete Goal"),
+                        content: const Text(
+                            "Are you sure you want to delete this goal?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, false),
+                            child: const Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, true),
+                            child: const Text("Delete"),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(uid)
+                          .collection('goals')
+                          .doc(goalId)
+                          .delete();
+                    }
+                  },
+                ),
               ],
             ),
+
             const SizedBox(height: 6),
+
             Text(
-              "EGP ${current.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
+              "EGP ${safeCurrent.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
+
             const SizedBox(height: 16),
+
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 18,
                 backgroundColor: Colors.grey.shade300,
-                color: AppColors.blue,
+                color: isCompleted ? Colors.green : AppColors.blue,
               ),
             ),
+
+            if (isCompleted)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  "Goal Completed 🎉",
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
