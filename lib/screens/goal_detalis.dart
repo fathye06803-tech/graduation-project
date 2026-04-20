@@ -9,9 +9,6 @@ class GoalDetailsScreen extends StatelessWidget {
   final String goalId;
   final String title;
 
-  // ملاحظة: لغينا تمرير current و target و timeframe كمتغيرات ثابتة
-  // لأننا هنجيبهم "لايف" من الـ Stream
-
   const GoalDetailsScreen({
     super.key,
     required this.goalId,
@@ -20,12 +17,10 @@ class GoalDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // جلب الـ UID الخاص بالمستخدم الحالي
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Scaffold(
       body: StreamBuilder<DocumentSnapshot>(
-        // هنا بنفتح "ماسورة" بيانات مع مستند الهدف ده بالذات
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
@@ -33,28 +28,29 @@ class GoalDetailsScreen extends StatelessWidget {
             .doc(goalId)
             .snapshots(),
         builder: (context, snapshot) {
-
-          // حالة التحميل
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // لو مفيش بيانات أو المستند اتمسح
           if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text("Goal not found"));
           }
 
-          // استخراج البيانات المحدثة من السناب شوت
           var goalData = snapshot.data!.data() as Map<String, dynamic>;
-          double current = (goalData['current'] ?? 0).toDouble();
           double target = (goalData['target'] ?? 0).toDouble();
-          String timeFrame = goalData['timeframe'] ?? "Not set";
 
+          // Logic to make sure current doesn't exceed target
+          double rawCurrent = (goalData['current'] ?? 0).toDouble();
+          double current = rawCurrent > target ? target : rawCurrent;
+
+          String timeFrame = goalData['timeframe'] ?? "Not set";
           double progress = target > 0 ? current / target : 0;
+
+          // Check if goal is completed
+          bool isCompleted = progress >= 1.0;
 
           return Stack(
             children: [
-              /// Header
               Container(
                 height: 260,
                 width: double.infinity,
@@ -66,8 +62,6 @@ class GoalDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              /// Top Bar
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -98,8 +92,6 @@ class GoalDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              /// Body
               Padding(
                 padding: const EdgeInsets.only(top: 160),
                 child: Container(
@@ -117,8 +109,6 @@ class GoalDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 20),
-
-                        /// Title
                         Text(
                           title,
                           style: const TextStyle(
@@ -127,70 +117,61 @@ class GoalDetailsScreen extends StatelessWidget {
                             color: AppColors.blue,
                           ),
                         ),
-
                         const SizedBox(height: 25),
-
-                        /// Target
                         const Text("Target Amount", style: TextStyle(fontSize: 16)),
                         Text(
                           "EGP ${target.toStringAsFixed(0)}",
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                         ),
-
                         const SizedBox(height: 20),
-
-                        /// Saved
                         const Text("Saved Amount", style: TextStyle(fontSize: 16)),
                         Text(
                           "EGP ${current.toStringAsFixed(0)}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.blue,
+                            color: isCompleted ? Colors.green : AppColors.blue,
                           ),
                         ),
-
                         const SizedBox(height: 25),
-
-                        /// Progress Bar
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: progress > 1 ? 1 : progress, // عشان ميتخطاش الـ 100% كشكل
+                            value: progress,
                             minHeight: 12,
                             backgroundColor: Colors.grey.shade300,
-                            color: AppColors.blue,
+                            color: isCompleted ? Colors.green : AppColors.blue,
                           ),
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          "${(progress * 100).toStringAsFixed(1)}% completed",
-                          style: const TextStyle(fontWeight: FontWeight.w500),
+                          isCompleted
+                              ? "Goal Achieved! 🎉"
+                              : "${(progress * 100).toStringAsFixed(1)}% completed",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: isCompleted ? Colors.green : Colors.black,
+                          ),
                         ),
-
                         const SizedBox(height: 25),
-
-                        /// Time Frame
                         const Text("Time Frame", style: TextStyle(fontSize: 16)),
                         Text(
                           timeFrame,
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                         ),
-
                         const Spacer(),
-
-                        /// Add Deposit Button
                         SizedBox(
                           width: double.infinity,
                           height: 55,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.blue,
+                              backgroundColor: isCompleted ? Colors.grey : AppColors.blue,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            onPressed: () {
+                            // Disable button if goal is completed
+                            onPressed: isCompleted ? null : () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -201,9 +182,9 @@ class GoalDetailsScreen extends StatelessWidget {
                                 ),
                               );
                             },
-                            child: const Text(
-                              "Add Deposit",
-                              style: TextStyle(fontSize: 18, color: Colors.white),
+                            child: Text(
+                              isCompleted ? "Goal Completed" : "Add Deposit",
+                              style: const TextStyle(fontSize: 18, color: Colors.white),
                             ),
                           ),
                         ),

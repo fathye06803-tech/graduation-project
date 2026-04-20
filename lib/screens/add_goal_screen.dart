@@ -19,13 +19,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
   Future<void> addGoal() async {
     final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must login first")),
-      );
-      return;
-    }
+    if (user == null) return;
 
     if (titleController.text.isEmpty || targetController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -34,230 +28,171 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       return;
     }
 
-    double? target = double.tryParse(targetController.text);
-
-    if (target == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter valid amount")),
-      );
-      return;
-    }
-
+    setState(() => isLoading = true);
     try {
-      setState(() => isLoading = true);
-
-      final goalRef = FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('goals')
-          .doc();
-
-      await goalRef.set({
-        'goalId': goalRef.id,
-        'userId': user.uid,
+          .add({
         'title': titleController.text.trim(),
-        'target': target,
+        'target': double.parse(targetController.text.trim()),
         'current': 0.0,
         'timeFrame': selectedTime,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Goal added successfully")),
-      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Goal added successfully")),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
-  }
-
-  @override
-  void dispose() {
-    titleController.dispose();
-    targetController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           Container(
-            height: 260,
+            height: 200,
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.blue,
-                  AppColors.blue,
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
+            decoration: const BoxDecoration(color: AppColors.blue),
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  IconButton(
-                    icon: SvgPicture.asset(
-                      "assets/icon/back.svg",
-                      color: AppColors.background,
-                      width: 24,
-                      height: 24,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 20),
-                  const Text(
-                    "Add Financial Goal",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          "Create New Goal",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              )
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel("Goal Name"),
+                              TextField(
+                                controller: titleController,
+                                decoration: _inputDecoration("e.g. New Laptop"),
+                              ),
+                              const SizedBox(height: 20),
+                              _buildLabel("Target Amount (EGP)"),
+                              TextField(
+                                controller: targetController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration("e.g. 50000"),
+                              ),
+                              const SizedBox(height: 20),
+                              _buildLabel("Time Frame"),
+                              DropdownButtonFormField<String>(
+                                value: selectedTime,
+                                decoration: _inputDecoration(""),
+                                items: ["6 months", "12 months", "24 months"]
+                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                    .toList(),
+                                onChanged: (val) => setState(() => selectedTime = val!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.blue,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                            onPressed: isLoading ? null : addGoal,
+                            child: isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text(
+                              "Save Goal",
+                              style: TextStyle(color: Colors.white, fontSize: 18),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 160),
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 30),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Goal name",
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          color: AppColors.blue,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: titleController,
-                      decoration: InputDecoration(
-                        hintText: "Dream car",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 25),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Target Amount",
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          color: AppColors.blue,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: targetController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: "EGP 10,000",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 25),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Time frame",
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          color: AppColors.blue,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      value: selectedTime,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: "6 months", child: Text("6 months")),
-                        DropdownMenuItem(value: "12 months", child: Text("12 months")),
-                        DropdownMenuItem(value: "24 months", child: Text("24 months")),
-                        DropdownMenuItem(value: "3 years", child: Text("3 years")),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          selectedTime = value!;
-                        });
-                      },
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: isLoading ? null : addGoal,
-                        child: isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                          "Save Goal",
-                          style: TextStyle(
-                            fontFamily: 'Work_Sans',
-                            color: AppColors.background,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.blue,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: Colors.grey.shade200),
       ),
     );
   }

@@ -214,7 +214,7 @@ class GoalCard extends StatelessWidget {
                   },
                 ),
 
-                /// Delete
+                /// Delete (Updated with History Cleanup)
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () async {
@@ -223,37 +223,53 @@ class GoalCard extends StatelessWidget {
                       builder: (context) => AlertDialog(
                         title: const Text("Delete Goal"),
                         content: const Text(
-                            "Are you sure you want to delete this goal?"),
+                            "Are you sure? This will also delete all savings history for this goal."),
                         actions: [
                           TextButton(
-                            onPressed: () =>
-                                Navigator.pop(context, false),
+                            onPressed: () => Navigator.pop(context, false),
                             child: const Text("Cancel"),
                           ),
                           TextButton(
-                            onPressed: () =>
-                                Navigator.pop(context, true),
-                            child: const Text("Delete"),
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text("Delete", style: TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
                     );
 
                     if (confirm == true) {
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(uid)
-                          .collection('goals')
-                          .doc(goalId)
-                          .delete();
+                      try {
+                        // 1. Delete all deposits related to this goal first
+                        var depositsSnapshot = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .collection('deposits')
+                            .where('goalId', isEqualTo: goalId)
+                            .get();
+
+                        for (var doc in depositsSnapshot.docs) {
+                          await doc.reference.delete();
+                        }
+
+                        // 2. Delete the goal itself
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .collection('goals')
+                            .doc(goalId)
+                            .delete();
+
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Error deleting goal: $e")),
+                        );
+                      }
                     }
                   },
                 ),
               ],
             ),
-
             const SizedBox(height: 6),
-
             Text(
               "EGP ${safeCurrent.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
               style: const TextStyle(
@@ -261,9 +277,7 @@ class GoalCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 16),
-
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
@@ -273,7 +287,6 @@ class GoalCard extends StatelessWidget {
                 color: isCompleted ? Colors.green : AppColors.blue,
               ),
             ),
-
             if (isCompleted)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
