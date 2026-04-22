@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "212220895347",
+    "project_id": "bluecash-7b5b4",
+    "storage_bucket": "bluecash-7b5b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212220895347:android:20fb310f058a04ecdd0a06",
+        "android_client_info": {
+          "package_name": "com.example.blue_cash"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxCw8EChisyDMkbdOmTAzKHSoOYwSNfK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

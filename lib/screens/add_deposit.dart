@@ -19,8 +19,19 @@ class AddDepositScreen extends StatefulWidget {
 
 class _AddDepositScreenState extends State<AddDepositScreen> {
   final TextEditingController amountController = TextEditingController();
-  DateTime? selectedDate;
+  DateTime? selectedDate = DateTime.now();
   bool isLoading = false;
+
+  final List<Color> contributionColors = [
+    AppColors.blue,
+    Colors.redAccent,
+    Colors.green,
+    Colors.orangeAccent,
+    Colors.purpleAccent,
+    Colors.pinkAccent,
+  ];
+
+  Color selectedColor = AppColors.blue;
 
   Future<void> addDeposit() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -33,26 +44,20 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
       return;
     }
 
-    if (amountController.text.isEmpty || selectedDate == null) {
-      if (!mounted) return;
+    final double amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+    if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter amount and date")),
+        const SnackBar(content: Text("Please enter a valid amount")),
       );
       return;
     }
 
-    final double amount = double.tryParse(amountController.text.trim()) ?? 0.0;
-
     setState(() => isLoading = true);
 
     try {
-      final goalRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('goals')
-          .doc(widget.goalId);
+      String safeName = user.displayName ?? user.email?.split('@')[0] ?? "User";
 
-      // 1. Fetch current goal data to check limits
+      final goalRef = FirebaseFirestore.instance.collection('goals').doc(widget.goalId);
       final goalSnapshot = await goalRef.get();
 
       if (goalSnapshot.exists) {
@@ -61,42 +66,39 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
         final double current = (data['current'] ?? 0.0).toDouble();
         final double remaining = target - current;
 
-        // 2. Validation: Check if entered amount exceeds remaining target
         if (amount > remaining) {
           if (!mounted) return;
           setState(() => isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Amount exceeds target! Remaining needed: EGP ${remaining.toStringAsFixed(2)}"),
+              content: Text("Amount exceeds target! Remaining: EGP ${remaining.toStringAsFixed(2)}"),
               backgroundColor: Colors.red,
             ),
           );
-          return; // Stop the process
+          return;
         }
       }
 
-      // 3. Update the goal's current amount
+      // 1. تحديث المبلغ الحالي في الهدف الرئيسي
       await goalRef.update({
         'current': FieldValue.increment(amount),
       });
 
-      // 4. Add the deposit record
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('deposits')
-          .add({
-        'goalId': widget.goalId,
-        'goalName': widget.goalName,
+      // 2. إضافة سجل الإيداع في المجموعة الفرعية (المعدل)
+      await goalRef.collection('deposits').add({
         'amount': amount,
-        'date': Timestamp.fromDate(selectedDate!),
+        'userId': user.uid,
+        'userName': safeName,
+        'goalName': widget.goalName,
+        'color': selectedColor.value,
+        'date': Timestamp.fromDate(selectedDate ?? DateTime.now()),
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Deposit added successfully")),
+          const SnackBar(content: Text("Deposit added successfully!")),
         );
       }
     } catch (e) {
@@ -134,16 +136,11 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      "Add New Deposit",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      "Add Contribution",
+                      style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 10),
                     Text(
-                      "Saving for: ${widget.goalName}",
+                      "Goal: ${widget.goalName}",
                       style: const TextStyle(color: Colors.white70, fontSize: 16),
                     ),
                     const SizedBox(height: 40),
@@ -152,51 +149,56 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          )
-                        ],
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Amount", style: TextStyle(color: AppColors.blue, fontSize: 16)),
-                          const SizedBox(height: 10),
+                          _buildFieldLabel("Amount (EGP)"),
                           TextField(
                             controller: amountController,
                             keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              // Trigger rebuild to update button state
-                              setState(() {});
-                            },
-                            decoration: InputDecoration(
-                              hintText: "Enter amount",
-                              filled: true,
-                              fillColor: Colors.grey.shade100,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide.none,
-                              ),
+                            onChanged: (value) => setState(() {}),
+                            decoration: _inputStyle("Enter your contribution"),
+                          ),
+                          const SizedBox(height: 25),
+                          _buildFieldLabel("Choose Your Contribution Color"),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 45,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: contributionColors.length,
+                              itemBuilder: (context, index) {
+                                final color = contributionColors[index];
+                                return GestureDetector(
+                                  onTap: () => setState(() => selectedColor = color),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 15),
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: selectedColor == color ? Colors.black : Colors.transparent,
+                                        width: 3,
+                                      ),
+                                    ),
+                                    child: selectedColor == color
+                                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                        : null,
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          const Text("Date", style: TextStyle(color: AppColors.blue, fontSize: 16)),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 25),
+                          _buildFieldLabel("Contribution Date"),
                           InkWell(
-                            onTap: () async {
-                              DateTime? picked = await showDatePicker(
-                                context: context,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) setState(() => selectedDate = picked);
-                            },
+                            onTap: _pickDate,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(14),
@@ -204,11 +206,7 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Text(
-                                    selectedDate == null
-                                        ? "Select Date"
-                                        : "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
-                                  ),
+                                  Text("${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"),
                                   const Spacer(),
                                   const Icon(Icons.calendar_today, size: 20, color: AppColors.blue),
                                 ],
@@ -222,20 +220,12 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.blue,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
-                              // Logic to disable the button if fields are empty or loading
-                              onPressed: (isLoading || amountController.text.isEmpty || selectedDate == null)
-                                  ? null
-                                  : addDeposit,
+                              onPressed: (isLoading || amountController.text.isEmpty) ? null : addDeposit,
                               child: isLoading
                                   ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text(
-                                "Confirm Deposit",
-                                style: TextStyle(color: Colors.white, fontSize: 18),
-                              ),
+                                  : const Text("Confirm Contribution", style: TextStyle(color: Colors.white, fontSize: 18)),
                             ),
                           ),
                         ],
@@ -248,6 +238,32 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
           )
         ],
       ),
+    );
+  }
+
+  void _pickDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => selectedDate = picked);
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(label, style: const TextStyle(color: AppColors.blue, fontSize: 15, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  InputDecoration _inputStyle(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
     );
   }
 }

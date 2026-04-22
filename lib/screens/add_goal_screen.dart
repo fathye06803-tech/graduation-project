@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
@@ -30,9 +29,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
     setState(() => isLoading = true);
     try {
+      String safeName = user.displayName ?? user.email?.split('@')[0] ?? "User";
+
       await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
           .collection('goals')
           .add({
         'title': titleController.text.trim(),
@@ -40,12 +39,15 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
         'current': 0.0,
         'timeFrame': selectedTime,
         'createdAt': FieldValue.serverTimestamp(),
+        'creatorId': user.uid,
+        'creatorName': safeName,
+        'members': [user.uid],
       });
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Goal added successfully")),
+          const SnackBar(content: Text("Shared Goal created successfully!")),
         );
       }
     } catch (e) {
@@ -85,7 +87,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          "Create New Goal",
+                          "New Shared Goal",
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 32,
@@ -112,7 +114,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                               _buildLabel("Goal Name"),
                               TextField(
                                 controller: titleController,
-                                decoration: _inputDecoration("e.g. New Laptop"),
+                                decoration: _inputDecoration("e.g. Family Trip"),
                               ),
                               const SizedBox(height: 20),
                               _buildLabel("Target Amount (EGP)"),
@@ -149,7 +151,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                             child: isLoading
                                 ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text(
-                              "Save Goal",
+                              "Create Goal",
                               style: TextStyle(color: Colors.white, fontSize: 18),
                             ),
                           ),

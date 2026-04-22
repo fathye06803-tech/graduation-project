@@ -18,23 +18,17 @@ class MyGoalsScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          /// Header Background
           Container(
             height: 260,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.blue,
-                  AppColors.blue,
-                ],
+                colors: [AppColors.blue, AppColors.blue],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
             ),
           ),
-
-          /// Header UI
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -53,8 +47,6 @@ class MyGoalsScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          /// Goals List Container
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -68,14 +60,12 @@ class MyGoalsScreen extends StatelessWidget {
               ),
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(uid)
                     .collection('goals')
-                    .orderBy('createdAt', descending: true)
+                    .where('members', arrayContains: uid)
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return const Center(child: Text("Error loading goals"));
+                    return Center(child: Text("Error: ${snapshot.error}"));
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -85,7 +75,7 @@ class MyGoalsScreen extends StatelessWidget {
                   final goals = snapshot.data!.docs;
 
                   if (goals.isEmpty) {
-                    return const Center(child: Text("No goals yet"));
+                    return const Center(child: Text("No shared goals yet"));
                   }
 
                   return ListView.builder(
@@ -119,17 +109,12 @@ class MyGoalsScreen extends StatelessWidget {
           "assets/icon/add.svg",
           width: 24,
           height: 24,
-          colorFilter: const ColorFilter.mode(
-            Colors.white,
-            BlendMode.srcIn,
-          ),
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
         ),
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const AddGoalScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const AddGoalScreen()),
           );
         },
       ),
@@ -155,8 +140,6 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
-
     double safeCurrent = current > target ? target : current;
     double progress = target > 0 ? safeCurrent / target : 0;
     bool isCompleted = safeCurrent >= target;
@@ -195,8 +178,6 @@ class GoalCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                /// Edit
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColors.blue),
                   onPressed: () {
@@ -213,22 +194,16 @@ class GoalCard extends StatelessWidget {
                     );
                   },
                 ),
-
-                /// Delete (Updated with History Cleanup)
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () async {
                     bool? confirm = await showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text("Delete Goal"),
-                        content: const Text(
-                            "Are you sure? This will also delete all savings history for this goal."),
+                        title: const Text("Delete Shared Goal"),
+                        content: const Text("Are you sure? This will remove the goal for everyone."),
                         actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text("Cancel"),
-                          ),
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             child: const Text("Delete", style: TextStyle(color: Colors.red)),
@@ -239,30 +214,9 @@ class GoalCard extends StatelessWidget {
 
                     if (confirm == true) {
                       try {
-                        // 1. Delete all deposits related to this goal first
-                        var depositsSnapshot = await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(uid)
-                            .collection('deposits')
-                            .where('goalId', isEqualTo: goalId)
-                            .get();
-
-                        for (var doc in depositsSnapshot.docs) {
-                          await doc.reference.delete();
-                        }
-
-                        // 2. Delete the goal itself
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(uid)
-                            .collection('goals')
-                            .doc(goalId)
-                            .delete();
-
+                        await FirebaseFirestore.instance.collection('goals').doc(goalId).delete();
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Error deleting goal: $e")),
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                       }
                     }
                   },
@@ -272,10 +226,7 @@ class GoalCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               "EGP ${safeCurrent.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
             ClipRRect(
@@ -290,13 +241,7 @@ class GoalCard extends StatelessWidget {
             if (isCompleted)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  "Goal Completed 🎉",
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: Text("Goal Completed 🎉", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
               ),
           ],
         ),

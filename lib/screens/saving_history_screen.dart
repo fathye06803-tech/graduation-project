@@ -16,9 +16,10 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          /// Header Background
+          // الخلفية الزرقاء في الأعلى
           Container(
             height: 260,
             width: double.infinity,
@@ -30,32 +31,21 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           ),
-
-          /// Header UI
-          SafeArea(
+          // العنوان
+          const SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  // أضفت IconButton للرجوع إذا كنت تتنقل لهذه الشاشة من مكان آخر
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.maybePop(context),
-                  ),
-                  const Text(
-                    "Savings History",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Text(
+                "Savings History",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-
-          /// History List Container
+          // محتوى القائمة
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -70,11 +60,10 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               child: user == null
                   ? const Center(child: Text("Please login first"))
                   : StreamBuilder<QuerySnapshot>(
-                // الـ Stream ده هيتحدث تلقائياً أول ما تمسح Goal من الشاشة التانية
+                // جلب كل الـ deposits التي تخص المستخدم الحالي عبر جميع الأهداف
                 stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .collection('deposits')
+                    .collectionGroup('deposits')
+                    .where('userId', isEqualTo: user.uid)
                     .orderBy('date', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
@@ -82,18 +71,12 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
+                  if (snapshot.hasError) {
+                    return Center(child: Text("Error: ${snapshot.error}"));
+                  }
+
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("💰", style: TextStyle(fontSize: 50)),
-                          SizedBox(height: 10),
-                          Text("No deposits yet",
-                              style: TextStyle(color: Colors.grey, fontSize: 16)),
-                        ],
-                      ),
-                    );
+                    return _buildEmptyState();
                   }
 
                   var docs = snapshot.data!.docs;
@@ -103,11 +86,12 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
                       var data = docs[index].data() as Map<String, dynamic>;
-
-                      String goalName = data['goalName'] ?? "General Savings";
                       double amount = (data['amount'] as num?)?.toDouble() ?? 0;
+                      // جلب لون اليوزر المخزن عند العملية
+                      int colorValue = data['color'] ?? AppColors.blue.value;
+                      // جلب اسم الهدف
+                      String goalName = data['goalName'] ?? "Goal Contribution";
 
-                      // معالجة التاريخ بأمان
                       DateTime date;
                       if (data['date'] is Timestamp) {
                         date = (data['date'] as Timestamp).toDate();
@@ -121,6 +105,10 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          border: Border(
+                            // الخط الجانبي بلون اليوزر
+                            left: BorderSide(color: Color(colorValue), width: 5),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
@@ -132,28 +120,38 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Row(
                               children: [
-                                Text(
-                                  goalName,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.blue,
-                                  ),
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Color(colorValue).withOpacity(0.1),
+                                  child: Icon(Icons.savings, color: Color(colorValue), size: 18),
                                 ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  "${date.day}/${date.month}/${date.year}",
-                                  style: TextStyle(color: Colors.grey.shade600),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      goalName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.blue,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      "${date.day}/${date.month}/${date.year}",
+                                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                             Text(
                               "+ EGP ${amount.toStringAsFixed(0)}",
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
                               ),
@@ -167,6 +165,21 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           )
+        ],
+      ),
+    );
+  }
+
+  // واجهة الحالة الفارغة
+  Widget _buildEmptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text("💰", style: TextStyle(fontSize: 50)),
+          SizedBox(height: 10),
+          Text("No deposits found for your account",
+              style: TextStyle(color: Colors.grey, fontSize: 16)),
         ],
       ),
     );
