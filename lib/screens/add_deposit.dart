@@ -79,12 +79,10 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
         }
       }
 
-      // 1. تحديث المبلغ الحالي في الهدف الرئيسي
       await goalRef.update({
         'current': FieldValue.increment(amount),
       });
 
-      // 2. إضافة سجل الإيداع في المجموعة الفرعية (المعدل)
       await goalRef.collection('deposits').add({
         'amount': amount,
         'userId': user.uid,
