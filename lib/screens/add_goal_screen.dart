@@ -29,25 +29,46 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
     setState(() => isLoading = true);
     try {
+      double targetAmount = double.parse(targetController.text.trim());
+      DateTime now = DateTime.now();
+      DateTime deadline;
+      double monthlyInstallment = 0;
+      double dailyInstallment = 0;
+
+      // Logic to parse selectedTime and calculate Deadline/Installments
+      if (selectedTime == "29 day") {
+        deadline = now.add(const Duration(days: 29));
+        dailyInstallment = targetAmount / 29;
+        monthlyInstallment = targetAmount; // Full amount within the month
+      } else {
+        // Extract number of months from string (e.g., "12 months" -> 12)
+        int months = int.parse(selectedTime.split(' ')[0]);
+        deadline = DateTime(now.year, now.month + months, now.day);
+        monthlyInstallment = targetAmount / months;
+        dailyInstallment = targetAmount / (months * 30);
+      }
+
       String safeName = user.displayName ?? user.email?.split('@')[0] ?? "User";
 
-      await FirebaseFirestore.instance
-          .collection('goals')
-          .add({
+      await FirebaseFirestore.instance.collection('goals').add({
         'title': titleController.text.trim(),
-        'target': double.parse(targetController.text.trim()),
+        'target': targetAmount,
         'current': 0.0,
         'timeFrame': selectedTime,
+        'deadline': Timestamp.fromDate(deadline),
+        'monthlyInstallment': double.parse(monthlyInstallment.toStringAsFixed(2)),
+        'dailyInstallment': double.parse(dailyInstallment.toStringAsFixed(2)),
         'createdAt': FieldValue.serverTimestamp(),
         'creatorId': user.uid,
         'creatorName': safeName,
         'members': [user.uid],
+        'isAutoDeduct': true,
       });
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Shared Goal created successfully!")),
+          const SnackBar(content: Text("Goal created with smart tracking!")),
         );
       }
     } catch (e) {
@@ -68,99 +89,112 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       body: Stack(
         children: [
           Container(
-            height: 200,
+            height: 260,
             width: double.infinity,
-            decoration: const BoxDecoration(color: AppColors.blue),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.blue, AppColors.blue],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
           SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Text(
+                        "New Goal",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          "New Shared Goal",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+                    decoration: const BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel("Goal Name"),
+                          TextField(
+                            controller: titleController,
+                            decoration: _inputStyle("New Car"),
                           ),
-                        ),
-                        const SizedBox(height: 40),
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              )
-                            ],
+                          const SizedBox(height: 25),
+                          _buildLabel("Target Amount"),
+                          TextField(
+                            controller: targetController,
+                            keyboardType: TextInputType.number,
+                            decoration: _inputStyle("50000"),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel("Goal Name"),
-                              TextField(
-                                controller: titleController,
-                                decoration: _inputDecoration("e.g. Family Trip"),
-                              ),
-                              const SizedBox(height: 20),
-                              _buildLabel("Target Amount (EGP)"),
-                              TextField(
-                                controller: targetController,
-                                keyboardType: TextInputType.number,
-                                decoration: _inputDecoration("e.g. 50000"),
-                              ),
-                              const SizedBox(height: 20),
-                              _buildLabel("Time Frame"),
-                              DropdownButtonFormField<String>(
-                                value: selectedTime,
-                                decoration: _inputDecoration(""),
-                                items: ["6 months", "12 months", "24 months"]
-                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                                    .toList(),
-                                onChanged: (val) => setState(() => selectedTime = val!),
-                              ),
-                            ],
+                          const SizedBox(height: 25),
+                          _buildLabel("Time Frame"),
+                          DropdownButtonFormField<String>(
+                            value: selectedTime,
+                            dropdownColor: Colors.white,
+                            decoration: _inputStyle(""),
+                            items: [
+                              "1 month",
+                              "3 months",
+                              "6 months",
+                              "12 months",
+                              "24 months",
+                              "48 months"
+                            ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                            onChanged: (val) => setState(() => selectedTime = val!),
                           ),
-                        ),
-                        const SizedBox(height: 40),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 55,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.blue,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                          const SizedBox(height: 50),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.blue,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: isLoading ? null : addGoal,
+                              child: isLoading
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text(
+                                "Create Goal",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold),
                               ),
                             ),
-                            onPressed: isLoading ? null : addGoal,
-                            child: isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text(
-                              "Create Goal",
-                              style: TextStyle(color: Colors.white, fontSize: 18),
-                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -170,31 +204,36 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
   Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         text,
         style: const TextStyle(
           color: AppColors.blue,
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
         ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputStyle(String hint) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
       filled: true,
       fillColor: Colors.grey.shade100,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
       ),
     );
   }

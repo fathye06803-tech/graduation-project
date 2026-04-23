@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:rxdart/rxdart.dart';
 
 class SavingsHistoryScreen extends StatefulWidget {
   const SavingsHistoryScreen({super.key});
@@ -19,7 +20,6 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // الخلفية الزرقاء في الأعلى
           Container(
             height: 260,
             width: double.infinity,
@@ -31,12 +31,11 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           ),
-          // العنوان
           const SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Text(
-                "Savings History",
+                "Savings & Expenses",
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -45,7 +44,6 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
             ),
           ),
-          // محتوى القائمة
           Padding(
             padding: const EdgeInsets.only(top: 160),
             child: Container(
@@ -59,45 +57,71 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
               ),
               child: user == null
                   ? const Center(child: Text("Please login first"))
-                  : StreamBuilder<QuerySnapshot>(
-                // جلب كل الـ deposits التي تخص المستخدم الحالي عبر جميع الأهداف
-                stream: FirebaseFirestore.instance
-                    .collectionGroup('deposits')
-                    .where('userId', isEqualTo: user.uid)
-                    .orderBy('date', descending: true)
-                    .snapshots(),
+                  : StreamBuilder<List<QueryDocumentSnapshot>>(
+                stream: CombineLatestStream.list([
+                  FirebaseFirestore.instance
+                      .collectionGroup('deposits')
+                      .where('userId', isEqualTo: user.uid)
+                      .snapshots(),
+                  FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('fixed_expenses')
+                      .snapshots(),
+                ]).map((list) => list[0].docs + list[1].docs),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   if (snapshot.hasError) {
-                    return Center(child: Text("Error: ${snapshot.error}"));
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text(
+                          "Synchronizing data... Please wait a moment.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ),
+                    );
                   }
 
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return _buildEmptyState();
                   }
 
-                  var docs = snapshot.data!.docs;
+                  var allDocs = snapshot.data!;
+
+                  allDocs.sort((a, b) {
+                    var dataA = a.data() as Map<String, dynamic>;
+                    var dataB = b.data() as Map<String, dynamic>;
+
+                    Timestamp t1 = dataA['date'] ?? dataA['createdAt'] ?? Timestamp.now();
+                    Timestamp t2 = dataB['date'] ?? dataB['createdAt'] ?? Timestamp.now();
+
+                    return t2.compareTo(t1);
+                  });
 
                   return ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                    itemCount: docs.length,
+                    itemCount: allDocs.length,
                     itemBuilder: (context, index) {
-                      var data = docs[index].data() as Map<String, dynamic>;
-                      double amount = (data['amount'] as num?)?.toDouble() ?? 0;
-                      // جلب لون اليوزر المخزن عند العملية
-                      int colorValue = data['color'] ?? AppColors.blue.value;
-                      // جلب اسم الهدف
-                      String goalName = data['goalName'] ?? "Goal Contribution";
+                      var data = allDocs[index].data() as Map<String, dynamic>;
 
-                      DateTime date;
-                      if (data['date'] is Timestamp) {
-                        date = (data['date'] as Timestamp).toDate();
-                      } else {
-                        date = DateTime.now();
-                      }
+                      bool isDeposit = data.containsKey('goalName');
+
+                      double amount = (data['amount'] as num?)?.toDouble() ?? 0;
+                      int colorValue = isDeposit
+                          ? (data['color'] ?? AppColors.blue.value)
+                          : Colors.red.value;
+
+                      String title = isDeposit
+                          ? data['goalName']
+                          : (data['title'] ?? "Fixed Expense");
+
+                      Timestamp ts = data['date'] ?? data['createdAt'] ?? Timestamp.now();
+                      DateTime date = ts.toDate();
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 15),
@@ -106,7 +130,6 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border(
-                            // الخط الجانبي بلون اليوزر
                             left: BorderSide(color: Color(colorValue), width: 5),
                           ),
                           boxShadow: [
@@ -125,14 +148,18 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                                 CircleAvatar(
                                   radius: 18,
                                   backgroundColor: Color(colorValue).withOpacity(0.1),
-                                  child: Icon(Icons.savings, color: Color(colorValue), size: 18),
+                                  child: Icon(
+                                    isDeposit ? Icons.savings : Icons.money_off,
+                                    color: Color(colorValue),
+                                    size: 18,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      goalName,
+                                      title,
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -149,11 +176,11 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
                               ],
                             ),
                             Text(
-                              "+ EGP ${amount.toStringAsFixed(0)}",
-                              style: const TextStyle(
+                              isDeposit ? "+ EGP ${amount.toStringAsFixed(0)}" : "- EGP ${amount.toStringAsFixed(0)}",
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                                color: isDeposit ? Colors.green : Colors.red,
                               ),
                             )
                           ],
@@ -170,16 +197,14 @@ class _SavingsHistoryScreenState extends State<SavingsHistoryScreen> {
     );
   }
 
-  // واجهة الحالة الفارغة
   Widget _buildEmptyState() {
     return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("💰", style: TextStyle(fontSize: 50)),
+          Icon(Icons.bar_chart, size: 80, color: Colors.grey),
           SizedBox(height: 10),
-          Text("No deposits found for your account",
-              style: TextStyle(color: Colors.grey, fontSize: 16)),
+          Text("No transactions", style: TextStyle(color: Colors.grey, fontSize: 16)),
         ],
       ),
     );

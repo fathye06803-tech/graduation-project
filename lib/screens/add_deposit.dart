@@ -35,49 +35,81 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
 
   Future<void> addDeposit() async {
     final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in")),
-      );
-      return;
-    }
+    if (user == null) return;
 
     final double amount = double.tryParse(amountController.text.trim()) ?? 0.0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid amount")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a valid amount")));
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      String safeName = user.displayName ?? user.email?.split('@')[0] ?? "User";
-
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       final goalRef = FirebaseFirestore.instance.collection('goals').doc(widget.goalId);
-      final goalSnapshot = await goalRef.get();
 
-      if (goalSnapshot.exists) {
-        final data = goalSnapshot.data()!;
-        final double target = (data['target'] ?? 0.0).toDouble();
-        final double current = (data['current'] ?? 0.0).toDouble();
-        final double remaining = target - current;
+      var userDoc = await userRef.get();
+      var expensesSnapshot = await userRef.collection('fixed_expenses').get();
+      var allGoalsSnapshot = await FirebaseFirestore.instance
+          .collection('goals')
+          .where('members', arrayContains: user.uid)
+          .get();
 
-        if (amount > remaining) {
-          if (!mounted) return;
-          setState(() => isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Amount exceeds target! Remaining: EGP ${remaining.toStringAsFixed(2)}"),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
+      double currentSalary = (userDoc.data()?['salary'] ?? 0).toDouble();
+      double totalFixedExpenses = 0;
+      for (var exp in expensesSnapshot.docs) {
+        totalFixedExpenses += (exp.data()['amount'] ?? 0).toDouble();
+      }
+
+      double currentMonthContributions = 0;
+      DateTime now = DateTime.now();
+
+      for (var goalDoc in allGoalsSnapshot.docs) {
+        var depositsSnapshot = await goalDoc.reference
+            .collection('deposits')
+            .where('userId', isEqualTo: user.uid)
+            .get();
+
+        for (var deposit in depositsSnapshot.docs) {
+          var depData = deposit.data();
+          if (depData['date'] != null) {
+            DateTime depositDate = (depData['date'] as Timestamp).toDate();
+            if (depositDate.month == now.month && depositDate.year == now.year) {
+              currentMonthContributions += (depData['amount'] ?? 0).toDouble();
+            }
+          }
         }
       }
+
+      double remainingSalary = currentSalary - totalFixedExpenses - currentMonthContributions;
+
+      var goalDocSnapshot = await goalRef.get();
+      double targetAmount = (goalDocSnapshot.data()?['target'] ?? 0).toDouble();
+      double currentSaved = (goalDocSnapshot.data()?['current'] ?? 0).toDouble();
+      double remainingInGoal = targetAmount - currentSaved;
+
+      if (amount > remainingSalary) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Insufficient Salary! Remaining: EGP ${remainingSalary.toStringAsFixed(0)}")),
+          );
+        }
+        setState(() => isLoading = false);
+        return;
+      }
+
+      if (amount > remainingInGoal) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Amount exceeds Goal target! Remaining: EGP ${remainingInGoal.toStringAsFixed(0)}")),
+          );
+        }
+        setState(() => isLoading = false);
+        return;
+      }
+
+      String safeName = user.displayName ?? user.email?.split('@')[0] ?? "User";
 
       await goalRef.update({
         'current': FieldValue.increment(amount),
@@ -91,6 +123,8 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
         'color': selectedColor.value,
         'date': Timestamp.fromDate(selectedDate ?? DateTime.now()),
         'createdAt': FieldValue.serverTimestamp(),
+        'month': now.month,
+        'year': now.year,
       });
 
       if (mounted) {
@@ -101,9 +135,7 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -116,124 +148,157 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          // Header Gradient (Like My Goals)
           Container(
-            height: 200,
+            height: 260,
             width: double.infinity,
-            decoration: const BoxDecoration(color: AppColors.blue),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.blue, AppColors.blue],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
+
+          // Custom AppBar with Back Button
           SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Text(
+                    "Add Deposit",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Content Container (White Sheet)
+          Padding(
+            padding: const EdgeInsets.only(top: 160),
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "Add Contribution",
-                      style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                    ),
                     Text(
                       "Goal: ${widget.goalName}",
-                      style: const TextStyle(color: Colors.white70, fontSize: 16),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.blue,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    _buildFieldLabel("Amount (EGP)"),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputStyle("Enter amount"),
+                    ),
+                    const SizedBox(height: 20),
+
+                    _buildFieldLabel("Label Color"),
+                    SizedBox(
+                      height: 50,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: contributionColors.length,
+                        itemBuilder: (context, index) {
+                          final color = contributionColors[index];
+                          bool isSelected = selectedColor == color;
+                          return GestureDetector(
+                            onTap: () => setState(() => selectedColor = color),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected ? Colors.black : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    _buildFieldLabel("Deposit Date"),
+                    InkWell(
+                      onTap: _pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200, // Matches GoalCard color
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today, size: 20, color: AppColors.blue),
+                            const SizedBox(width: 12),
+                            Text(
+                              "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 40),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFieldLabel("Amount (EGP)"),
-                          TextField(
-                            controller: amountController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) => setState(() {}),
-                            decoration: _inputStyle("Enter your contribution"),
-                          ),
-                          const SizedBox(height: 25),
-                          _buildFieldLabel("Choose Your Contribution Color"),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 45,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: contributionColors.length,
-                              itemBuilder: (context, index) {
-                                final color = contributionColors[index];
-                                return GestureDetector(
-                                  onTap: () => setState(() => selectedColor = color),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(right: 15),
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: selectedColor == color ? Colors.black : Colors.transparent,
-                                        width: 3,
-                                      ),
-                                    ),
-                                    child: selectedColor == color
-                                        ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                        : null,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 25),
-                          _buildFieldLabel("Contribution Date"),
-                          InkWell(
-                            onTap: _pickDate,
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Row(
-                                children: [
-                                  Text("${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"),
-                                  const Spacer(),
-                                  const Icon(Icons.calendar_today, size: 20, color: AppColors.blue),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 55,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.blue,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              onPressed: (isLoading || amountController.text.isEmpty) ? null : addDeposit,
-                              child: isLoading
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text("Confirm Contribution", style: TextStyle(color: Colors.white, fontSize: 18)),
-                            ),
-                          ),
-                        ],
+
+                    // Main Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.blue,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          elevation: 0,
+                        ),
+                        onPressed: (isLoading) ? null : addDeposit,
+                        child: isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
+                          "Confirm Deposit",
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -251,8 +316,15 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
 
   Widget _buildFieldLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(label, style: const TextStyle(color: AppColors.blue, fontSize: 15, fontWeight: FontWeight.bold)),
+      padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.blue,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
@@ -260,8 +332,12 @@ class _AddDepositScreenState extends State<AddDepositScreen> {
     return InputDecoration(
       hintText: hint,
       filled: true,
-      fillColor: Colors.grey.shade100,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      fillColor: Colors.grey.shade200, // Matches GoalCard style
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide.none,
+      ),
     );
   }
 }

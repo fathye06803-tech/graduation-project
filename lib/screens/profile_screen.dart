@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/edit_profile_screen.dart';
 import 'package:blue_cash/screens/login_screen.dart';
+import 'package:blue_cash/screens/financial_management_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,6 +18,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String name = "";
   String email = "";
   double totalSavings = 0;
+  double salary = 0;
+  double remainingSalary = 0;
   int goalsCount = 0;
 
   @override
@@ -30,30 +33,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user == null) return;
 
     try {
-      // 1. Get user basic info
+      // 1. Fetch User Main Data
       var userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
 
-      // 2. Fetch Shared Goals where the user is a member
+      // 2. Fetch Fixed Expenses
+      var expensesSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('fixed_expenses')
+          .get();
+
+      // 3. Fetch Goals where user is a member
       var goalsSnapshot = await FirebaseFirestore.instance
           .collection('goals')
           .where('members', arrayContains: user.uid)
           .get();
 
-      double total = 0;
+      DateTime now = DateTime.now();
+      double currentMonthContributions = 0;
+      double allTimeSavings = 0;
 
-      // 3. For each shared goal, we calculate ONLY this user's contributions
+      // 4. Calculate All Time Savings vs Current Month Deposits
       for (var goalDoc in goalsSnapshot.docs) {
         var depositsSnapshot = await goalDoc.reference
             .collection('deposits')
-            .where('userId', isEqualTo: user.uid) // Fixed: isEqualTo instead of ifEqualTo
+            .where('userId', isEqualTo: user.uid)
             .get();
 
         for (var deposit in depositsSnapshot.docs) {
-          total += (deposit.data()['amount'] ?? 0).toDouble();
+          var data = deposit.data();
+          double amt = (data['amount'] ?? 0).toDouble();
+
+          // Total Savings (All time)
+          allTimeSavings += amt;
+
+          // Filter for current month deposits only
+          if (data['date'] != null) {
+            DateTime depositDate = (data['date'] as Timestamp).toDate();
+            if (depositDate.month == now.month && depositDate.year == now.year) {
+              currentMonthContributions += amt;
+            }
+          }
         }
+      }
+
+      // 5. Calculate Total Fixed Expenses
+      double currentSalary = (userDoc.data()?['salary'] ?? 0).toDouble();
+      double totalFixedExpenses = 0;
+      for (var exp in expensesSnapshot.docs) {
+        totalFixedExpenses += (exp.data()['amount'] ?? 0).toDouble();
       }
 
       if (mounted) {
@@ -61,7 +92,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           name = userDoc.data()?['name'] ?? user.displayName ?? user.email?.split('@')[0] ?? "User";
           email = user.email ?? "";
           goalsCount = goalsSnapshot.docs.length;
-          totalSavings = total;
+
+          // Card Values
+          totalSavings = allTimeSavings;
+          salary = currentSalary;
+
+          // Equation: Salary - Fixed Expenses - Deposits made this month only
+          remainingSalary = currentSalary - totalFixedExpenses - currentMonthContributions;
         });
       }
     } catch (e) {
@@ -109,128 +146,148 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   topRight: Radius.circular(30),
                 ),
               ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  const CircleAvatar(
-                    radius: 50,
-                    backgroundImage: AssetImage("assets/images/user.png"),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.blue,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 40),
+                    const CircleAvatar(
+                      radius: 50,
+                      backgroundImage: AssetImage("assets/images/user.png"),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    email,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+                    const SizedBox(height: 15),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.blue,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  "EGP ${totalSavings.toStringAsFixed(0)}",
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.blue,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                const Text(
-                                  "My Savings",
-                                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                                ),
-                              ],
-                            ),
+                    const SizedBox(height: 5),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _buildStatCard("Salary", salary),
+                          const SizedBox(width: 15),
+                          _buildStatCard("Remaining", remainingSalary),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _buildStatCard("Savings", totalSavings),
+                          const SizedBox(width: 15),
+                          _buildStatCard("Goals", goalsCount.toDouble(), isCount: true),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: AppColors.blue,
+                        size: 24,
+                      ),
+                      title: const Text("Financial Management"),
+                      subtitle: const Text("Salary, Expenses"),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FinancialManagementScreen(),
                           ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  "$goalsCount",
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.blue,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                const Text(
-                                  "Total Goals",
-                                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                                ),
-                              ],
-                            ),
+                        );
+                        fetchProfileData();
+                      },
+                    ),
+                    ListTile(
+                      leading: SvgPicture.asset(
+                        'assets/icon/edit.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(AppColors.blue, BlendMode.srcIn),
+                      ),
+                      title: const Text("Edit Profile"),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditProfileScreen(name: name, email: email),
                           ),
-                        ),
-                      ],
+                        );
+                        fetchProfileData();
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  ListTile(
-                    leading: SvgPicture.asset(
-                      'assets/icon/edit.svg',
-                      width: 24,
-                      height: 24,
-                      colorFilter: const ColorFilter.mode(AppColors.blue, BlendMode.srcIn),
+
+                    ListTile(
+                      leading: SvgPicture.asset(
+                        'assets/icon/logout.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(Colors.red, BlendMode.srcIn),
+                      ),
+                      title: const Text("Logout"),
+                      onTap: () {
+                        _showLogoutDialog(context);
+                      },
                     ),
-                    title: const Text("Edit Profile"),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditProfileScreen(name: name, email: email),
-                        ),
-                      );
-                      fetchProfileData();
-                    },
-                  ),
-                  ListTile(
-                    leading: SvgPicture.asset(
-                      'assets/icon/logout.svg',
-                      width: 24,
-                      height: 24,
-                      colorFilter: const ColorFilter.mode(Colors.red, BlendMode.srcIn),
-                    ),
-                    title: const Text("Logout"),
-                    onTap: () {
-                      _showLogoutDialog(context);
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, double value, {bool isCount = false}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              isCount ? value.toInt().toString() : "EGP ${value.toStringAsFixed(0)}",
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.blue,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 11),
+            ),
+          ],
+        ),
       ),
     );
   }

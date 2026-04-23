@@ -201,7 +201,7 @@ class GoalCard extends StatelessWidget {
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text("Delete Shared Goal"),
-                        content: const Text("Are you sure? This will remove the goal for everyone."),
+                        content: const Text("Are you sure? This will remove the goal and all its history."),
                         actions: [
                           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
                           TextButton(
@@ -214,9 +214,29 @@ class GoalCard extends StatelessWidget {
 
                     if (confirm == true) {
                       try {
-                        await FirebaseFirestore.instance.collection('goals').doc(goalId).delete();
+                        final goalRef = FirebaseFirestore.instance.collection('goals').doc(goalId);
+                        final depositsSnapshot = await goalRef.collection('deposits').get();
+
+                        WriteBatch batch = FirebaseFirestore.instance.batch();
+
+                        for (var doc in depositsSnapshot.docs) {
+                          batch.delete(doc.reference);
+                        }
+
+                        batch.delete(goalRef);
+                        await batch.commit();
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Goal and history deleted successfully")),
+                          );
+                        }
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Error: $e")),
+                          );
+                        }
                       }
                     }
                   },
