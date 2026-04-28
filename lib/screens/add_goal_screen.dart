@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:blue_cash/core/theme/app_color.dart';
+import 'package:blue_cash/core/services/notification_service.dart';
 
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
@@ -11,7 +12,7 @@ class AddGoalScreen extends StatefulWidget {
 }
 
 class _AddGoalScreenState extends State<AddGoalScreen> {
-  String selectedTime = "12 months";
+  String selectedTime = "1 month";
   final TextEditingController titleController = TextEditingController();
   final TextEditingController targetController = TextEditingController();
   bool isLoading = false;
@@ -35,13 +36,11 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       double monthlyInstallment = 0;
       double dailyInstallment = 0;
 
-      // Logic to parse selectedTime and calculate Deadline/Installments
-      if (selectedTime == "29 day") {
-        deadline = now.add(const Duration(days: 29));
-        dailyInstallment = targetAmount / 29;
-        monthlyInstallment = targetAmount; // Full amount within the month
+      if (selectedTime == "1 month") {
+        deadline = now.add(const Duration(days: 30));
+        dailyInstallment = targetAmount / 30;
+        monthlyInstallment = targetAmount;
       } else {
-        // Extract number of months from string (e.g., "12 months" -> 12)
         int months = int.parse(selectedTime.split(' ')[0]);
         deadline = DateTime(now.year, now.month + months, now.day);
         monthlyInstallment = targetAmount / months;
@@ -65,10 +64,17 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
         'isAutoDeduct': true,
       });
 
+
+      await NotificationService.scheduleGoalReminder(
+        goalName: titleController.text.trim(),
+        targetDate: deadline,
+        totalAmount: targetAmount,
+      );
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Goal created with smart tracking!")),
+          const SnackBar(content: Text("Goal created with smart notifications!")),
         );
       }
     } catch (e) {

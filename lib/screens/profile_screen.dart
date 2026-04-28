@@ -3,7 +3,7 @@ import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/edit_profile_screen.dart';
 import 'package:blue_cash/screens/login_screen.dart';
 import 'package:blue_cash/screens/financial_management_screen.dart';
-import 'package:blue_cash/screens/analytics_screen.dart'; // Import analytics screen
+import 'package:blue_cash/screens/analytics_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -139,17 +139,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 40),
-                    // --- MODIFIED CODE START ---
                     CircleAvatar(
                       radius: 50,
-                      backgroundColor: Colors.grey.shade200, // لون خلفية دائري خفيف
+                      backgroundColor: Colors.grey.shade200,
                       child: Icon(
-                        Icons.person, // أيقونة الشخص
-                        size: 60, // حجم الأيقونة
-                        color: AppColors.blue.withOpacity(0.6), // لون الأيقونة
+                        Icons.person,
+                        size: 60,
+                        color: AppColors.blue.withOpacity(0.6),
                       ),
                     ),
-                    // --- MODIFIED CODE END ---
                     const SizedBox(height: 15),
                     Text(
                       name,
@@ -191,7 +189,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // 1. Financial Management
                     ListTile(
                       leading: const Icon(
                         Icons.account_balance_wallet_outlined,
@@ -212,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
 
-                    // 2. Financial Analytics (The New Button)
                     ListTile(
                       leading: const Icon(
                         Icons.pie_chart_outline_rounded,
@@ -232,7 +228,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
 
-                    // 3. Edit Profile
                     ListTile(
                       leading: SvgPicture.asset(
                         'assets/icon/edit.svg',
@@ -253,7 +248,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
 
-                    // 4. Logout
                     ListTile(
                       leading: SvgPicture.asset(
                         'assets/icon/logout.svg',
@@ -266,6 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _showLogoutDialog(context);
                       },
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
