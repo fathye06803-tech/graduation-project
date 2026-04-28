@@ -16,8 +16,10 @@ class MyGoalsScreen extends StatelessWidget {
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          // Header Gradient
           Container(
             height: 260,
             width: double.infinity,
@@ -31,16 +33,16 @@ class MyGoalsScreen extends StatelessWidget {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 10),
                   const Text(
                     "My Goals",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -48,14 +50,14 @@ class MyGoalsScreen extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 160),
+            padding: const EdgeInsets.only(top: 140),
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+                  topLeft: Radius.circular(35),
+                  topRight: Radius.circular(35),
                 ),
               ),
               child: StreamBuilder<QuerySnapshot>(
@@ -69,31 +71,28 @@ class MyGoalsScreen extends StatelessWidget {
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator(color: AppColors.blue));
                   }
 
                   final goals = snapshot.data!.docs;
 
                   if (goals.isEmpty) {
-                    return const Center(child: Text("No shared goals yet"));
+                    return _buildEmptyState(context);
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 30, 20, 100),
                     itemCount: goals.length,
                     itemBuilder: (context, index) {
                       final doc = goals[index];
                       final data = doc.data() as Map<String, dynamic>;
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: GoalCard(
-                          goalId: doc.id,
-                          title: data["title"] ?? "",
-                          current: (data["current"] ?? 0).toDouble(),
-                          target: (data["target"] ?? 0).toDouble(),
-                          timeFrame: data["timeFrame"] ?? "",
-                        ),
+                      return GoalCard(
+                        goalId: doc.id,
+                        title: data["title"] ?? "",
+                        current: (data["current"] ?? 0).toDouble(),
+                        target: (data["target"] ?? 0).toDouble(),
+                        timeFrame: data["timeFrame"] ?? "",
                       );
                     },
                   );
@@ -105,18 +104,30 @@ class MyGoalsScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.blue,
-        child: SvgPicture.asset(
-          "assets/icon/add.svg",
-          width: 24,
-          height: 24,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-        ),
+        elevation: 4,
+        child: const Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddGoalScreen()),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.flag_outlined, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          const Text(
+            "No goals yet",
+            style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
@@ -140,132 +151,218 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double safeCurrent = current > target ? target : current;
-    double progress = target > 0 ? safeCurrent / target : 0;
-    bool isCompleted = safeCurrent >= target;
+    double progress = (target > 0) ? (current / target).clamp(0.0, 1.0) : 0.0;
+    bool isCompleted = current >= target;
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GoalDetailsScreen(
-              goalId: goalId,
-              title: title,
-            ),
-          ),
-        );
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GoalDetailsScreen(goalId: goalId, title: title),
+        ),
+      ),
       child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(20),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header Row
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 19,
                       fontWeight: FontWeight.bold,
                       color: AppColors.blue,
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit, color: AppColors.blue),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditGoalScreen(
-                          goalId: goalId,
-                          title: title,
-                          target: target,
-                          timeFrame: timeFrame,
-                        ),
-                      ),
-                    );
-                  },
+                _buildActionButtons(context),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Amount Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "EGP ${current.toStringAsFixed(0)} / ${target.toStringAsFixed(0)}",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    bool? confirm = await showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Delete Shared Goal"),
-                        content: const Text("Are you sure? This will remove the goal and all its history."),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (confirm == true) {
-                      try {
-                        final goalRef = FirebaseFirestore.instance.collection('goals').doc(goalId);
-                        final depositsSnapshot = await goalRef.collection('deposits').get();
-
-                        WriteBatch batch = FirebaseFirestore.instance.batch();
-
-                        for (var doc in depositsSnapshot.docs) {
-                          batch.delete(doc.reference);
-                        }
-
-                        batch.delete(goalRef);
-                        await batch.commit();
-
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Goal and history deleted successfully")),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Error: $e")),
-                          );
-                        }
-                      }
-                    }
-                  },
+                Text(
+                  "${(progress * 100).toStringAsFixed(0)}%",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.blue,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              "EGP ${safeCurrent.toStringAsFixed(0)} / EGP ${target.toStringAsFixed(0)}",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 18,
-                backgroundColor: Colors.grey.shade300,
-                color: isCompleted ? Colors.green : AppColors.blue,
-              ),
-            ),
+            const SizedBox(height: 12),
+
+            // Professional Multi-User Progress Bar
+            _buildMultiUserProgressBar(progress),
+
             if (isCompleted)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text("Goal Completed 🎉", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Row(
+                  children: const [
+                    Icon(Icons.stars_rounded, color: Colors.green, size: 20),
+                    SizedBox(width: 6),
+                    Text(
+                      "Goal Completed! 🎉",
+                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildMultiUserProgressBar(double totalProgress) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('goals')
+          .doc(goalId)
+          .collection('deposits')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          // Default bar if no deposits yet
+          return _baseProgressBar(
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: totalProgress,
+              child: Container(color: AppColors.blue),
+            ),
+          );
+        }
+
+        // Calculation for individual contributions
+        Map<String, double> contributions = {};
+        for (var doc in snapshot.data!.docs) {
+          String userId = doc['userId'] ?? 'unknown';
+          double amount = (doc['amount'] ?? 0).toDouble();
+          contributions[userId] = (contributions[userId] ?? 0) + amount;
+        }
+
+        // Different colors for different users
+        List<Color> palette = [AppColors.blue, Colors.orangeAccent, Colors.teal, Colors.purpleAccent, Colors.amber];
+
+        return _baseProgressBar(
+          child: Row(
+            children: contributions.entries.map((entry) {
+              int idx = contributions.keys.toList().indexOf(entry.key);
+              double ratio = entry.value / target;
+              if (ratio <= 0) return const SizedBox.shrink();
+
+              return Expanded(
+                flex: (ratio * 1000).toInt(),
+                child: Container(color: palette[idx % palette.length]),
+              );
+            }).toList()..add(
+              // Empty space
+                Expanded(
+                  flex: ((1 - totalProgress).clamp(0, 1) * 1000).toInt(),
+                  child: Container(color: Colors.transparent),
+                )
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _baseProgressBar({required Widget child}) {
+    return Container(
+      height: 12,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.edit_note_rounded, color: AppColors.blue, size: 26),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EditGoalScreen(
+                goalId: goalId,
+                title: title,
+                target: target,
+                timeFrame: timeFrame,
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+          onPressed: () => _confirmDelete(context),
+        ),
+      ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context) async {
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Delete Goal?"),
+        content: const Text("This will permanently remove the goal and all transaction history."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final goalRef = FirebaseFirestore.instance.collection('goals').doc(goalId);
+      final deposits = await goalRef.collection('deposits').get();
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      for (var doc in deposits.docs) { batch.delete(doc.reference); }
+      batch.delete(goalRef);
+      await batch.commit();
+    }
   }
 }

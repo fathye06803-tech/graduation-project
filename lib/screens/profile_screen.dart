@@ -3,6 +3,7 @@ import 'package:blue_cash/core/theme/app_color.dart';
 import 'package:blue_cash/screens/edit_profile_screen.dart';
 import 'package:blue_cash/screens/login_screen.dart';
 import 'package:blue_cash/screens/financial_management_screen.dart';
+import 'package:blue_cash/screens/analytics_screen.dart'; // Import analytics screen
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,20 +34,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user == null) return;
 
     try {
-      // 1. Fetch User Main Data
       var userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
 
-      // 2. Fetch Fixed Expenses
       var expensesSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('fixed_expenses')
           .get();
 
-      // 3. Fetch Goals where user is a member
       var goalsSnapshot = await FirebaseFirestore.instance
           .collection('goals')
           .where('members', arrayContains: user.uid)
@@ -56,7 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       double currentMonthContributions = 0;
       double allTimeSavings = 0;
 
-      // 4. Calculate All Time Savings vs Current Month Deposits
       for (var goalDoc in goalsSnapshot.docs) {
         var depositsSnapshot = await goalDoc.reference
             .collection('deposits')
@@ -66,11 +63,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         for (var deposit in depositsSnapshot.docs) {
           var data = deposit.data();
           double amt = (data['amount'] ?? 0).toDouble();
-
-          // Total Savings (All time)
           allTimeSavings += amt;
 
-          // Filter for current month deposits only
           if (data['date'] != null) {
             DateTime depositDate = (data['date'] as Timestamp).toDate();
             if (depositDate.month == now.month && depositDate.year == now.year) {
@@ -80,7 +74,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // 5. Calculate Total Fixed Expenses
       double currentSalary = (userDoc.data()?['salary'] ?? 0).toDouble();
       double totalFixedExpenses = 0;
       for (var exp in expensesSnapshot.docs) {
@@ -92,12 +85,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           name = userDoc.data()?['name'] ?? user.displayName ?? user.email?.split('@')[0] ?? "User";
           email = user.email ?? "";
           goalsCount = goalsSnapshot.docs.length;
-
-          // Card Values
           totalSavings = allTimeSavings;
           salary = currentSalary;
-
-          // Equation: Salary - Fixed Expenses - Deposits made this month only
           remainingSalary = currentSalary - totalFixedExpenses - currentMonthContributions;
         });
       }
@@ -150,10 +139,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 40),
-                    const CircleAvatar(
+                    // --- MODIFIED CODE START ---
+                    CircleAvatar(
                       radius: 50,
-                      backgroundImage: AssetImage("assets/images/user.png"),
+                      backgroundColor: Colors.grey.shade200, // لون خلفية دائري خفيف
+                      child: Icon(
+                        Icons.person, // أيقونة الشخص
+                        size: 60, // حجم الأيقونة
+                        color: AppColors.blue.withOpacity(0.6), // لون الأيقونة
+                      ),
                     ),
+                    // --- MODIFIED CODE END ---
                     const SizedBox(height: 15),
                     Text(
                       name,
@@ -194,6 +190,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
+
+                    // 1. Financial Management
                     ListTile(
                       leading: const Icon(
                         Icons.account_balance_wallet_outlined,
@@ -213,6 +211,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fetchProfileData();
                       },
                     ),
+
+                    // 2. Financial Analytics (The New Button)
+                    ListTile(
+                      leading: const Icon(
+                        Icons.pie_chart_outline_rounded,
+                        color: AppColors.blue,
+                        size: 24,
+                      ),
+                      title: const Text("Financial Analytics"),
+                      subtitle: const Text("Spending & Savings Charts"),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AnalyticsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // 3. Edit Profile
                     ListTile(
                       leading: SvgPicture.asset(
                         'assets/icon/edit.svg',
@@ -233,6 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
 
+                    // 4. Logout
                     ListTile(
                       leading: SvgPicture.asset(
                         'assets/icon/logout.svg',
