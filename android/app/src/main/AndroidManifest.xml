@@ -11,7 +11,6 @@
 
     <application
         android:label="blue_cash"
-        android:name="io.flutter.app.FlutterApplication"
         android:icon="@mipmap/ic_launcher">
 
         <activity
